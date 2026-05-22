@@ -15,7 +15,6 @@ import com.majeur.psclient.databinding.DialogSignInBinding
 import com.majeur.psclient.service.ShowdownService
 import com.majeur.psclient.service.ShowdownService.AttemptSignInCallback
 import com.majeur.psclient.util.SimpleTextWatcher
-import kotlinx.android.synthetic.main.dialog_sign_in.*
 
 class SignInDialog : DialogFragment(), View.OnClickListener, AttemptSignInCallback {
 
@@ -67,8 +66,8 @@ class SignInDialog : DialogFragment(), View.OnClickListener, AttemptSignInCallba
         if (requirePassword) {
             if (binding.password.text.isNotEmpty()) {
                 binding.password.isEnabled = false
-                button.text = "Loading..."
-                button.isEnabled = false
+                binding.button.text = "Loading..."
+                binding.button.isEnabled = false
                 isCancelable = false
                 service?.attemptSignIn(binding.username.text.toString(),
                         binding.password.text.toString(), this@SignInDialog)
@@ -77,7 +76,7 @@ class SignInDialog : DialogFragment(), View.OnClickListener, AttemptSignInCallba
             if (binding.username.text.isNotEmpty()) {
                 binding.username.isEnabled = false
                 binding.button.text = "Loading..."
-                button.isEnabled = false
+                binding.button.isEnabled = false
                 isCancelable = false
                 service!!.attemptSignIn(binding.username.text.toString(), this@SignInDialog)
             }
