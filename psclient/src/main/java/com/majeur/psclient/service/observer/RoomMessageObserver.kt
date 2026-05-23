@@ -58,11 +58,19 @@ abstract class RoomMessageObserver<C : RoomMessageObserver.UiCallbacks>(service:
                 onUpdateUsers(currentUsers.toList())
                 if (message.command != "L") printUserRelatedMessage("$username left")
             }
-            "html" -> { // printMessage("~html messages aren't supported yet~");
+            "html" -> {
+                val html = message.remainingArgsRaw
+                printHtml(Utils.prepareForHtml(html))
             }
-            "uhtml" -> { // printMessage("~html messages aren't supported yet~");
+            "uhtml" -> {
+                message.nextArg // skip uhtml id
+                val html = message.remainingArgsRaw
+                printHtml(Utils.prepareForHtml(html))
             }
-            "uhtmlchange" -> { // TODO
+            "uhtmlchange" -> {
+                message.nextArg // skip uhtml id
+                val html = message.remainingArgsRaw
+                printHtml(Utils.prepareForHtml(html))
             }
             "N", "n", "name" -> if (message.command != "N") handleNameChange(message)
             "c", "chat" -> handleChatMessage(message)
@@ -89,7 +97,15 @@ abstract class RoomMessageObserver<C : RoomMessageObserver.UiCallbacks>(service:
                 _usernameColorCache.clear()
                 onRoomDeInit()
             }
-            "noinit" -> { // TODO
+            "noinit" -> {
+                // Room doesn't exist or access denied — reset so UI isn't stuck
+                roomJoined = false
+                currentUsers.clear()
+                _usernameColorCache.clear()
+                val reason = if (message.hasNextArg) message.nextArg else ""
+                val detail = if (message.hasNextArg) message.nextArg else "Could not join room"
+                printErrorMessage(detail)
+                onRoomDeInit()
             }
         }
     }
@@ -121,6 +137,13 @@ abstract class RoomMessageObserver<C : RoomMessageObserver.UiCallbacks>(service:
             userMessage.startsWith("/uhtml") -> {
                 val html = userMessage.substringAfter(",") // msg: /uhtml id,
                 printHtml(Utils.prepareForHtml(html))
+            }
+            userMessage.startsWith("/me") || userMessage.startsWith("/me ") -> {
+                val action = userMessage.removePrefix("/me").trimStart()
+                val spannable = SpannableStringBuilder("* $user $action")
+                spannable.setSpan(TextTagSpan(getHashColor(userWithPrefix)), 0, user.length + 2, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
+                spannable.setSpan(UsernameSpan(user), 2, user.length + 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                printMessage(spannable)
             }
             else -> {
                 val announce = userMessage.startsWith("/announce")

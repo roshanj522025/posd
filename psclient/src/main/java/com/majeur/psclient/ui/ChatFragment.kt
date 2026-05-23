@@ -182,6 +182,8 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     }
 
     override fun onRoomDeInit() {
+        _observedRoomId = null
+        observer?.observedRoomId = null
         setUiState(roomJoined = false)
     }
 
@@ -198,10 +200,12 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         val l = binding.chatLog.length()
         binding.chatLog.append("\u200C")
         binding.chatLog.editableText.setSpan(mark, l, l + 1, Spanned.SPAN_MARK_MARK)
+        val imgWidth = if (binding.chatLog.width > 0) binding.chatLog.width
+                       else resources.displayMetrics.widthPixels
         Html.fromHtml(
                 html,
                 Html.FROM_HTML_MODE_COMPACT,
-                glideHelper.getHtmlImageGetter(assetLoader, binding.chatLog.width),
+                glideHelper.getHtmlImageGetter(assetLoader, imgWidth),
                 Callback { spanned: Spanned? ->
                     val at = binding.chatLog.editableText.getSpanStart(mark)
                     if (at == -1) return@Callback // View was cleared while loading
