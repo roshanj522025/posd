@@ -25,8 +25,10 @@ class JoinChatRoomDialog : BottomSheetDialogFragment() {
     private var _binding: DialogJoinRoomBinding? = null
     private val binding get() = _binding!!
 
-    // Access service through the activity the same way the rest of the UI does
-    private val service get() = (requireActivity() as MainActivity).service
+    // Follow the same pattern as SearchBattleDialog: access service via the
+    // parent fragment rather than casting the activity directly
+    private val chatFragment get() = parentFragment as ChatFragment
+    private val service get() = chatFragment.mainActivity.service
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,7 +78,6 @@ class JoinChatRoomDialog : BottomSheetDialogFragment() {
     }
 
     private fun joinRoom(roomName: String) {
-        // Normalise to a valid PS room ID before sending
         val roomId = roomName.lowercase(Locale.ROOT).replace("[^a-z0-9-]".toRegex(), "")
         if (roomId.isEmpty()) return
         service?.sendGlobalCommand("join", roomId)
