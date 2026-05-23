@@ -43,6 +43,12 @@
             android:theme="@style/Theme.PSClient.TeamBuilderActivityTheme"
             android:exported="false"/>
 
+        <activity
+            android:name=".PSClient$CrashActivity"
+            android:exported="false"
+            android:process=":crash"
+            android:theme="@style/Theme.AppCompat.NoActionBar"/>
+
         <service
             android:name=".service.ShowdownService"
             android:exported="false"/>
