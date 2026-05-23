@@ -203,8 +203,14 @@ class GlobalMessageObserver(service: ShowdownService)
             val catName = rawCategory.substringAfter("|").substringBefore("|")
             val formats = rawCategory.substringAfter(catName).split("|")
                     .filter { s -> s.isNotBlank() }
-                    .map { s ->
-                        BattleFormat(s.substringBefore(","), s.substringAfter(",").toInt(16))
+                    .mapNotNull { s ->
+                        try {
+                            val name = s.substringBefore(",")
+                            val flags = s.substringAfter(",", "").trim().toInt(16)
+                            BattleFormat(name, flags)
+                        } catch (e: NumberFormatException) {
+                            Timber.w("Skipping malformed format entry: \'$s\'")                            null
+                        }
                     }
             BattleFormat.Category().apply {
                 this.formats.addAll(formats)
