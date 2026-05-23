@@ -15,6 +15,7 @@ import com.majeur.psclient.databinding.ListFooterOtherRoomBinding
 import com.majeur.psclient.databinding.ListItemRoomBinding
 import com.majeur.psclient.model.ChatRoomInfo
 import com.majeur.psclient.util.*
+import com.majeur.psclient.ui.MainActivity
 import java.util.*
 
 class JoinChatRoomDialog : BottomSheetDialogFragment() {
@@ -25,10 +26,7 @@ class JoinChatRoomDialog : BottomSheetDialogFragment() {
     private var _binding: DialogJoinRoomBinding? = null
     private val binding get() = _binding!!
 
-    // Follow the same pattern as SearchBattleDialog: access service via the
-    // parent fragment rather than casting the activity directly
-    private val chatFragment get() = parentFragment as ChatFragment
-    private val service get() = chatFragment.mainActivity.service
+    private val service get() = (requireActivity() as MainActivity).service
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
