@@ -129,12 +129,12 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
                 sendButton.isEnabled = false
                 sendButton.drawable.alpha = 128
                 joinButton.setImageResource(R.drawable.ic_enter)
-                joinButton.requestFocus() // Remove focus from message input widget
-                chatLog.animate().alpha(0f).withEndAction {
-                    chatLog.text = "\n\n\n\n\n\n\n\n\n\nTap the join button to join a room"
-                    chatLog.gravity = Gravity.CENTER_HORIZONTAL
-                    chatLog.animate().alpha(1f).withEndAction(null).start()
-                }.start()
+                joinButton.requestFocus()
+                // Cancel any in-progress animation before modifying text
+                chatLog.animate().cancel()
+                chatLog.alpha = 1f
+                chatLog.text = "\n\n\n\n\n\n\n\n\n\nTap the join button to join a room"
+                chatLog.gravity = Gravity.CENTER_HORIZONTAL
             }
             inputMethodManager.hideSoftInputFromWindow(binding.messageInput.windowToken, 0)
         }
@@ -197,29 +197,32 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     }
 
     override fun onPrintText(text: CharSequence) {
-        val fullScrolled = Utils.fullScrolled(binding.chatLogContainer)
-        if (binding.chatLog.length() > 0) binding.chatLog.append("\n")
-        binding.chatLog.append(text)
+        val b = _binding ?: return  // fragment view may be destroyed
+        val fullScrolled = Utils.fullScrolled(b.chatLogContainer)
+        if (b.chatLog.length() > 0) b.chatLog.append("\n")
+        b.chatLog.append(text)
         notifyNewMessageReceived()
         if (fullScrolled) postFullScroll()
     }
 
     override fun onPrintHtml(html: String) {
+        val b = _binding ?: return  // fragment view destroyed
         val mark = Any()
-        val l = binding.chatLog.length()
-        binding.chatLog.append("\u200C")
-        binding.chatLog.editableText.setSpan(mark, l, l + 1, Spanned.SPAN_MARK_MARK)
-        val imgWidth = if (binding.chatLog.width > 0) binding.chatLog.width
+        val l = b.chatLog.length()
+        b.chatLog.append("\u200C")
+        b.chatLog.editableText.setSpan(mark, l, l + 1, Spanned.SPAN_MARK_MARK)
+        val imgWidth = if (b.chatLog.width > 0) b.chatLog.width
                        else resources.displayMetrics.widthPixels
         Html.fromHtml(
                 html,
                 Html.FROM_HTML_MODE_COMPACT,
                 glideHelper.getHtmlImageGetter(assetLoader, imgWidth),
                 Callback { spanned: Spanned? ->
-                    val at = binding.chatLog.editableText.getSpanStart(mark)
-                    if (at == -1) return@Callback // View was cleared while loading
-                    val fullScrolled = Utils.fullScrolled(binding.chatLogContainer)
-                    binding.chatLog.editableText
+                    val b2 = _binding ?: return@Callback  // view destroyed while image was loading
+                    val at = b2.chatLog.editableText.getSpanStart(mark)
+                    if (at == -1) return@Callback  // text was cleared while loading
+                    val fullScrolled = Utils.fullScrolled(b2.chatLogContainer)
+                    b2.chatLog.editableText
                             .insert(at, "\n")
                             .insert(at + 1, spanned)
                     notifyNewMessageReceived()
