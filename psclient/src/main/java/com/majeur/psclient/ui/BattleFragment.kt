@@ -46,6 +46,9 @@ import kotlinx.coroutines.launch
 
 class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, View.OnClickListener {
 
+    // Null when service is not yet bound (e.g. during HomeFragment.onUiCallbacksAttached
+    // on second launch before BattleFragment.onServiceBound has fired).
+    // All UI-callback methods guard via `val obs = observer ?: return` before use.
     private val observer get() = service?.battleMessageObserver
 
     private lateinit var glideHelper: GlideHelper
@@ -71,8 +74,9 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
             observer?.observedRoomId = observedRoomId
         }
 
+    // Safe defaults when service is not yet bound
     val battleRunning get() = observer?.battleRunning == true
-    val isReplay get() = observer?.isReplay == true
+    val isReplay     get() = observer?.isReplay     == true
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -99,7 +103,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         inactiveBattleOverlayDrawable = InactiveBattleOverlayDrawable(resources)
         binding.apply {
             battleLog.movementMethod = LinkMovementMethod()
-            battleLog.setText("", TextView.BufferType.EDITABLE) // Setting the editable buffer type
+            battleLog.setText("", TextView.BufferType.EDITABLE)
             overlayImage.setImageDrawable(inactiveBattleOverlayDrawable)
             battleDecisionWidget.onRevealListener = { reveal ->
                 if (reveal) {
@@ -110,15 +114,12 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                     extraActionLayout.setTopOffset(0, BattleDecisionWidget.REVEAL_ANIMATION_DURATION)
                 }
             }
-
-
             extraActions.timerButton.setOnClickListener(this@BattleFragment)
             extraActions.forfeitButton.setOnClickListener(this@BattleFragment)
             extraActions.sendButton.setOnClickListener(this@BattleFragment)
             undoButton.setOnClickListener(this@BattleFragment)
             rematchButton.setOnClickListener(this@BattleFragment)
             uploadReplayButton.setOnClickListener(this@BattleFragment)
-
             replayActions.replayBackButton.setOnClickListener(this@BattleFragment)
             replayActions.replayPlayButton.setOnClickListener(this@BattleFragment)
             replayActions.replayForwardButton.setOnClickListener(this@BattleFragment)
@@ -143,9 +144,6 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
 
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
-        // Pause replay if user switches away to another fragment
-        // Do a isResumed check, because this method gets triggered on activity start, and
-        // battleType is not yet available at that point
         if (super.isResumed() && hidden && observer?.isReplay == true) pauseReplay()
     }
 
@@ -212,17 +210,18 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
 
     override fun onClick(clickedView: View?) {
         if (observedRoomId == null) return
+        val obs = observer ?: return
         when (clickedView) {
             binding.extraActions.forfeitButton -> {
-                if (observer.isReplay) {
+                if (obs.isReplay) {
                     service?.replayManager?.closeReplay()
-                } else if (battleRunning && observer.isUserPlaying) {
+                } else if (battleRunning && obs.isUserPlaying) {
                     AlertDialog.Builder(requireActivity())
                             .setMessage("Do you really want to forfeit this battle ?")
                             .setPositiveButton("Forfeit") { _, _ -> forfeit() }
                             .setNegativeButton("Cancel", null)
                             .show()
-                } else { // Acts as a leave button when user is spectator
+                } else {
                     service?.sendRoomCommand(observedRoomId, "leave")
                 }
             }
@@ -254,22 +253,18 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
             binding.undoButton -> {
                 binding.undoButton.isEnabled = false
                 sendUndoCommand()
-                observer.reAskForRequest()
+                obs.reAskForRequest()
             }
             binding.rematchButton -> {
-                homeFragment.challengeSomeone(observer.foeUsername)
+                homeFragment.challengeSomeone(obs.foeUsername)
             }
             binding.uploadReplayButton -> {
                 binding.extraActionLayout.hideItem(R.id.upload_replay_button)
                 sendSaveReplayCommand()
             }
-            binding.replayActions.replayForwardButton -> {
-                service?.replayManager?.goToNextTurn()
-            }
-            binding.replayActions.replayBackButton -> {
-                service?.replayManager?.goToStart()
-            }
-            binding.replayActions.replayPlayButton -> {
+            binding.replayActions.replayForwardButton -> service?.replayManager?.goToNextTurn()
+            binding.replayActions.replayBackButton    -> service?.replayManager?.goToStart()
+            binding.replayActions.replayPlayButton    -> {
                 if (service?.replayManager?.isPaused == true) unpauseReplay() else pauseReplay()
             }
         }
@@ -294,14 +289,15 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     private val onBindPopupListener = { anchorView: View, titleView: TextView, descView: TextView, placeHolderTop: ImageView, placeHolderBottom: ImageView ->
         when (val data = anchorView.getTag(R.id.battle_data_tag)) {
             is BattlingPokemon -> bindBattlingPokemonTipPopup(data, titleView, descView, placeHolderTop, placeHolderBottom)
-            is Move -> bindMoveTipPopup(data, titleView, descView, placeHolderTop, placeHolderBottom)
-            is SidePokemon -> bindSidePokemonPopup(data, titleView, descView, placeHolderTop, placeHolderBottom)
+            is Move            -> bindMoveTipPopup(data, titleView, descView, placeHolderTop, placeHolderBottom)
+            is SidePokemon     -> bindSidePokemonPopup(data, titleView, descView, placeHolderTop, placeHolderBottom)
         }
     }
 
     private fun bindBattlingPokemonTipPopup(pokemon: BattlingPokemon, titleView: TextView,
                                             descView: TextView, placeHolderTop: ImageView,
                                             placeHolderBottom: ImageView) {
+        val obs = observer ?: return
         placeHolderTop.setImageDrawable(null)
         placeHolderBottom.setImageDrawable(null)
 
@@ -315,7 +311,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
             pokemon.condition?.let { condition ->
                 append("HP: ".small())
                 append("%.1f%% ".format(condition.health * 100).bold().color(healthColor(condition.health)))
-                if (pokemon.trainer && observer.isUserPlaying) append("(${condition.hp}/${condition.maxHp}) ".small())
+                if (pokemon.trainer && obs.isUserPlaying) append("(${condition.hp}/${condition.maxHp}) ".small())
                 condition.status?.let { append(it.toUpperCase().small().tag(statusColor(it))) }
                 append("\n")
             }
@@ -323,7 +319,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
             var ability: String? = null
             if (pokemon.trainer && lastDecisionRequest?.side != null) {
                 val sidePokemon = lastDecisionRequest!!.side[pokemon.position]
-                if (pokemon.transformSpecies == null) { // Ditto case
+                if (pokemon.transformSpecies == null) {
                     pokemon.statModifiers.apply {
                         append("Atk:".small() concat calcReadableStat("atk", sidePokemon.stats.atk) concat
                                 " Def:".small() concat calcReadableStat("def", sidePokemon.stats.def) concat
@@ -335,7 +331,6 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 }
                 append("Ability: ".small() concat sidePokemon.ability concat "\n")
                 ability = sidePokemon.ability
-
                 append("Item: ".small() concat sidePokemon.item.or("None"))
                 fragmentScope.launch {
                     assetLoader.item(sidePokemon.item.toId())?.let { item ->
@@ -353,10 +348,10 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 placeHolderTop.setImageResource(Type.getResId(dexPokemon.firstType))
                 dexPokemon.secondType?.let { placeHolderBottom.setImageResource(Type.getResId(it)) }
 
-                if (pokemon.trainer && observer.isUserPlaying) {
+                if (pokemon.trainer && obs.isUserPlaying) {
                     if (ability == null) return@launch
                     val abilityName = if (dexPokemon.hiddenAbility?.toId() == ability) dexPokemon.hiddenAbility
-                    else  dexPokemon.abilities.firstOrNull { it.toId() == ability }
+                    else dexPokemon.abilities.firstOrNull { it.toId() == ability }
                     if (abilityName != null) Utils.replace(descView.editableText, ability, abilityName)
                     return@launch
                 }
@@ -370,14 +365,14 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                     append(dexPokemon.hiddenAbility ?: dexPokemon.abilities.firstOrNull() ?: "none")
                     append("\n")
                 }
-                val speedRange = Stats.calculateSpeedRange(pokemon.level, dexPokemon.baseStats.spe, "Random Battle", observer.gen)
+                val speedRange = Stats.calculateSpeedRange(pokemon.level, dexPokemon.baseStats.spe, "Random Battle", obs.gen)
                 append("Speed: ".small() concat "${speedRange[0]} to ${speedRange[1]}" concat " (before items/abilities/modifiers)".small())
             }
         }
     }
 
-    private fun bindMoveTipPopup(move: Move, titleView: TextView, descView: TextView, placeHolderTop: ImageView,
-                                 placeHolderBottom: ImageView) {
+    private fun bindMoveTipPopup(move: Move, titleView: TextView, descView: TextView,
+                                 placeHolderTop: ImageView, placeHolderBottom: ImageView) {
         var moveName: String? = null
         if (move.maxflag) moveName = move.maxDetails?.name ?: move.maxMoveId
         if (move.zflag) moveName = move.zName
@@ -389,11 +384,10 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         if (move.zflag) priority = move.zDetails?.priority ?: 0
         if (priority == -20) priority = move.details?.priority ?: 0
         when {
-            priority > 1 -> descView.append("Nearly always moves first (" concat priority.toSignedString().italic() concat ")\n")
+            priority > 1  -> descView.append("Nearly always moves first (" concat priority.toSignedString().italic() concat ")\n")
             priority <= -1 -> descView.append("Nearly always moves last (" concat priority.toSignedString().italic() concat ")\n")
             priority == 1 -> descView.append("Usually moves first (" concat priority.toSignedString().italic() concat ")\n")
         }
-
         var basePower = -1
         if (move.maxflag) basePower = move.details?.maxPower ?: 0
         if (move.zflag) basePower = move.zDetails?.basePower ?: move.details?.zPower ?: 0
@@ -418,19 +412,18 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         if (type == null) type = move.details?.type ?: "???"
         placeHolderTop.setImageResource(Type.getResId(type))
         val category = move.details?.category
-        val drawable = if (category != null) CategoryDrawable(category) else null
-        placeHolderBottom.setImageDrawable(drawable)
+        placeHolderBottom.setImageDrawable(if (category != null) CategoryDrawable(category) else null)
     }
 
     private fun bindSidePokemonPopup(pokemon: SidePokemon, titleView: TextView,
-                                     descView: TextView, placeHolderTop: ImageView, placeHolderBottom: ImageView) {
+                                     descView: TextView, placeHolderTop: ImageView,
+                                     placeHolderBottom: ImageView) {
         titleView.text = pokemon.name
         descView.apply {
             text = "HP: ".small() concat String.format("%.1f%% ", pokemon.condition.health * 100).bold().color(healthColor(pokemon.condition.health)) concat
                     "(" + pokemon.condition.hp + "/" + pokemon.condition.maxHp + ")"
             if (pokemon.condition.status != null)
                 append(pokemon.condition.status!!.toUpperCase().small().tag(statusColor(pokemon.condition.status)))
-
             append("\n" concat
                     "Atk:".small() concat pokemon.stats.atk.toString() concat
                     " Def:".small() concat pokemon.stats.def.toString() concat
@@ -456,7 +449,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         placeHolderTop.setImageDrawable(null)
         placeHolderBottom.setImageDrawable(null)
         fragmentScope.launch {
-            assetLoader.dexPokemon(pokemon.species.toId())?.let {dexPokemon ->
+            assetLoader.dexPokemon(pokemon.species.toId())?.let { dexPokemon ->
                 placeHolderTop.setImageResource(Type.getResId(dexPokemon.firstType))
                 if (dexPokemon.secondType != null) placeHolderBottom.setImageResource(Type.getResId(dexPokemon.secondType))
                 val abilityName = dexPokemon.matchingAbility(pokemon.ability, or = "")
@@ -465,9 +458,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         }
     }
 
-    private fun notifyNewMessageReceived() {
-        mainActivity.showBadge(id)
-    }
+    private fun notifyNewMessageReceived() = mainActivity.showBadge(id)
 
     override fun onTimerEnabled(enabled: Boolean) {
         timerEnabled = enabled
@@ -476,15 +467,17 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     }
 
     override fun onPlayerInit(playerUsername: String, foeUsername: String) {
+        val obs = observer ?: return
         binding.trainerInfo.setUsername(playerUsername)
         binding.foeInfo.setUsername(foeUsername)
-        if (!observer.isUserPlaying) { // Spectator cannot forfeit nor toggle timer
+        if (!obs.isUserPlaying) {
             binding.extraActions.forfeitButton.setImageResource(R.drawable.ic_exit)
             binding.extraActions.timerButton.visibility = GONE
         }
     }
 
     override fun onBattleStarted() {
+        val obs = observer ?: return
         prepareBattleFieldUi()
         mainActivity.setKeepScreenOn(true)
         binding.battleLayout.apply {
@@ -493,22 +486,22 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 view.setTag(R.id.glide_tag, null)
             }
         }
-        when (observer.gameType) {
+        when (obs.gameType) {
             GameType.SINGLE -> binding.battleLayout.setMode(BattleLayout.MODE_BATTLE_SINGLE)
             GameType.DOUBLE -> binding.battleLayout.setMode(BattleLayout.MODE_BATTLE_DOUBLE)
             GameType.TRIPLE -> binding.battleLayout.setMode(BattleLayout.MODE_BATTLE_TRIPLE)
             null -> {}
         }
         if (soundEnabled) audioManager.playBattleMusic()
-        //sendChatMessage("[Playing from the unofficial Android Showdown client]");
     }
 
     override fun onBattleEnded(winner: String) {
+        val obs = observer ?: return
         mainActivity.setKeepScreenOn(false)
         audioManager.stopBattleMusic()
         inactiveBattleOverlayDrawable.setWinner(winner)
         clearBattleFieldUi()
-        if (observer.isUserPlaying) {
+        if (obs.isUserPlaying) {
             binding.extraActionLayout.apply {
                 showItem(R.id.rematch_button)
                 showItem(R.id.upload_replay_button)
@@ -518,7 +511,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
             }
             binding.extraActions.timerButton.visibility = GONE
         }
-        if (observer.isReplay) {
+        if (obs.isReplay) {
             binding.replayActions.apply {
                 replayPlayButton.isEnabled = false
                 replayForwardButton.isEnabled = false
@@ -527,7 +520,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     }
 
     override fun onPreviewStarted() {
-        if (isReplay) return // We skip team previewing for replays
+        if (isReplay) return
         prepareBattleFieldUi()
         binding.battleLayout.setMode(BattleLayout.MODE_PREVIEW)
     }
@@ -539,9 +532,8 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 infoView.appendPokemon(pokemon, BitmapDrawable(resources, it))
             }
         }
-        if (isReplay) return // We skip team previewing for replays
+        if (isReplay) return
         binding.battleLayout.getSpriteView(id)?.apply {
-            // Can be null when joining a battle where the preview has already been done
             glideHelper.loadPreviewSprite(id.player, pokemon, this)
         }
     }
@@ -553,22 +545,23 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     }
 
     override fun onFaint(id: PokemonId) {
+        val obs = observer ?: return
         binding.battleLayout.getSpriteView(id)?.apply {
             animate()
-                .setDuration(250)
-                .setInterpolator(AccelerateDecelerateInterpolator())
-                .translationY(height / 2f)
-                .alpha(0f)
-                .withEndAction {
-                    translationY = 0f
-                    setImageDrawable(null)
-                    battleTipPopup.removeTippedView(this)
-                }.start()
+                    .setDuration(250)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .translationY(height / 2f)
+                    .alpha(0f)
+                    .withEndAction {
+                        translationY = 0f
+                        setImageDrawable(null)
+                        battleTipPopup.removeTippedView(this)
+                    }.start()
         }
         binding.battleLayout.getStatusView(id)?.animate()?.alpha(0f)?.start()
         val playerView = if (id.foe) binding.foeInfo else binding.trainerInfo
-        playerView.setPokemonFainted(observer.getBattlingPokemon(id))
-        if (soundEnabled) audioManager.playPokemonCry(observer.getBattlingPokemon(id), true)
+        playerView.setPokemonFainted(obs.getBattlingPokemon(id))
+        if (soundEnabled) audioManager.playPokemonCry(obs.getBattlingPokemon(id), true)
     }
 
     override fun onMove(sourceId: PokemonId, targetId: PokemonId?, moveName: String, shouldAnim: Boolean) {
@@ -618,24 +611,20 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         if (soundEnabled && "mega" == pokemon.forme) audioManager.playPokemonCry(pokemon, false)
     }
 
-    override fun onSwap(id: PokemonId, targetIndex: Int) {
-        binding.battleLayout.swap(id, targetIndex)
-    }
+    override fun onSwap(id: PokemonId, targetIndex: Int) = binding.battleLayout.swap(id, targetIndex)
 
     override fun onHealthChanged(id: PokemonId, condition: Condition) {
-        val statusView = binding.battleLayout.getStatusView(id)
-        statusView?.setHealth(condition.health)
+        binding.battleLayout.getStatusView(id)?.setHealth(condition.health)
     }
 
     override fun onStatusChanged(id: PokemonId, status: String?) {
-        val statusView = binding.battleLayout.getStatusView(id)
-        statusView?.setStatus(status)
+        binding.battleLayout.getStatusView(id)?.setStatus(status)
     }
 
     override fun onStatChanged(id: PokemonId) {
-        val statModifiers = observer.getBattlingPokemon(id)!!.statModifiers
-        val statusView = binding.battleLayout.getStatusView(id)
-        statusView?.updateModifier(statModifiers)
+        val obs = observer ?: return
+        val statModifiers = obs.getBattlingPokemon(id)!!.statModifiers
+        binding.battleLayout.getStatusView(id)?.updateModifier(statModifiers)
     }
 
     private fun checkWillCrash(request: BattleDecisionRequest): Boolean {
@@ -650,10 +639,11 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     }
 
     override fun onDecisionRequest(request: BattleDecisionRequest) {
+        val obs = observer ?: return
         lastDecisionRequest = request
         if (checkWillCrash(request)) return
         if (request.shouldWait) return
-        binding.battleDecisionWidget.promptDecision(observer, battleTipPopup, request) { decision ->
+        binding.battleDecisionWidget.promptDecision(obs, battleTipPopup, request) { decision ->
             sendDecision(request.id, decision)
         }
         var hideSwitch = true
@@ -699,8 +689,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     }
 
     override fun onDisplayBattleToast(id: PokemonId, text: String, color: Int) {
-        val toasterView = binding.battleLayout.getToasterView(id)
-        toasterView?.makeToast(text, color)
+        binding.battleLayout.getToasterView(id)?.makeToast(text, color)
     }
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
@@ -712,11 +701,9 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 alpha = 0f
                 setImageResource(resId)
                 tag = resId
-                animate().alpha(0.75f).setDuration(250).withEndAction(null)
-                        .start()
+                animate().alpha(0.75f).setDuration(250).withEndAction(null).start()
             } else {
-                animate().alpha(0f).setDuration(250).withEndAction { setImageDrawable(null) }
-                        .start()
+                animate().alpha(0f).setDuration(250).withEndAction { setImageDrawable(null) }.start()
             }
         }
     }
@@ -771,7 +758,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 glideHelper.getHtmlImageGetter(assetLoader, binding.battleLog.width),
                 Callback { spanned: Spanned? ->
                     val at = binding.battleLog.editableText.getSpanStart(mark)
-                    if (at == -1) return@Callback   // Check if text has been cleared
+                    if (at == -1) return@Callback
                     val fullScrolled = Utils.fullScrolled(binding.battleLogContainer)
                     binding.battleLog.editableText
                             .insert(at, "\n")
@@ -781,23 +768,17 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 })
     }
 
-    override fun goToLatest() {
-        postFullScroll()
-    }
+    override fun goToLatest() = postFullScroll()
 
     private fun postFullScroll() {
         binding.battleLogContainer.post { _binding?.battleLogContainer?.fullScroll(View.FOCUS_DOWN) }
     }
 
-    override fun onRoomTitleChanged(title: String) {
-        // Ignored
-    }
-
-    override fun onUpdateUsers(users: List<String>) {
-        // Ignored
-    }
+    override fun onRoomTitleChanged(title: String) { /* ignored */ }
+    override fun onUpdateUsers(users: List<String>) { /* ignored */ }
 
     override fun onRoomInit() {
+        val obs = observer ?: return
         soundEnabled = Preferences.isBattleSoundEnabled(requireContext())
         lastDecisionRequest = null
         onTimerEnabled(false)
@@ -823,8 +804,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 }
                 start()
             }
-
-            if (observer.isReplay) {
+            if (obs.isReplay) {
                 extraActionLayout.showItem(R.id.replay_actions)
                 extraActions.apply {
                     sendButton.visibility = GONE
@@ -840,7 +820,6 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 extraActionLayout.hideItem(R.id.replay_actions)
             }
         }
-        // In case of corrupted battle stream make sure we stop music at the next one
         audioManager.stopBattleMusic()
     }
 
