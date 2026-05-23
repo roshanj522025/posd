@@ -22,43 +22,50 @@ class GlobalMessageObserver(service: ShowdownService)
     var isUserGuest: Boolean = true
         private set
 
-    private var requestServerCountsOnly = false
-    private var requestRoomListForUi = false
+    // Tracks what the pending |queryresponse|rooms| response should do.
+    // All reads and writes happen on the WebSocket message thread, so no
+    // synchronisation is needed beyond keeping the enum in a single field.
+    private enum class RoomsQueryPurpose { COUNTS_ONLY, FULL_ROOM_LIST }
+    private var pendingRoomsQueryPurpose = RoomsQueryPurpose.COUNTS_ONLY
+
     private val privateMessages = mutableMapOf<String, MutableList<String>>()
 
     override fun onUiCallbacksAttached() {
-        // If we did not stored at least username, we will not have anything else
+        // If we did not store at least the username we will not have anything else
         val username = service.getSharedData<String>("myusername") ?: return
 
         onUserChanged(username, isUserGuest, /* TODO */ "000")
-        onUpdateCounts(service.getSharedData("users") ?: -1,
-                service.getSharedData("battles") ?: -1)
-
+        onUpdateCounts(
+            service.getSharedData("users") ?: -1,
+            service.getSharedData("battles") ?: -1
+        )
         onBattleFormatsChanged(service.getSharedData("formats") ?: emptyList())
-
-        onSearchBattlesChanged(service.getSharedData("searching") ?: emptyList(),
-                service.getSharedData("games") ?: emptyMap())
-
-        onChallengesChange(service.getSharedData("challenge_to"),
-                service.getSharedData("challenge_to_format"),
-                service.getSharedData("challenge_from") ?: emptyMap())
+        onSearchBattlesChanged(
+            service.getSharedData("searching") ?: emptyList(),
+            service.getSharedData("games") ?: emptyMap()
+        )
+        onChallengesChange(
+            service.getSharedData("challenge_to"),
+            service.getSharedData("challenge_to_format"),
+            service.getSharedData("challenge_from") ?: emptyMap()
+        )
     }
 
     public override fun onMessage(message: ServerMessage) {
         message.newArgsIteration()
         when (message.command) {
-            "connected" -> onConnectedToServer()
-            "challstr" -> processChallengeString(message)
-            "updateuser" -> processUpdateUser(message)
-            "queryresponse" -> processQueryResponse(message)
-            "formats" -> processAvailableFormats(message)
-            "popup" -> handlePopup(message)
-            "updatesearch" -> handleUpdateSearch(message)
-            "pm" -> handlePm(message)
+            "connected"        -> onConnectedToServer()
+            "challstr"         -> processChallengeString(message)
+            "updateuser"       -> processUpdateUser(message)
+            "queryresponse"    -> processQueryResponse(message)
+            "formats"          -> processAvailableFormats(message)
+            "popup"            -> handlePopup(message)
+            "updatesearch"     -> handleUpdateSearch(message)
+            "pm"               -> handlePm(message)
             "updatechallenges" -> handleChallenges(message)
-            "networkerror" -> onNetworkError()
-            "init" -> onRoomInit(message.roomId, message.nextArg)
-            "deinit" -> onRoomDeinit(message.roomId)
+            "networkerror"     -> onNetworkError()
+            "init"             -> onRoomInit(message.roomId, message.nextArg)
+            "deinit"           -> onRoomDeinit(message.roomId)
             "noinit" -> {
                 if (message.hasNextArg && "nonexistent" == message.nextArg && message.hasNextArg)
                     onShowPopup(message.nextArg)
@@ -67,8 +74,7 @@ class GlobalMessageObserver(service: ShowdownService)
                 message.nextArg // Skipping name
                 onShowPopup(message.nextArg)
             }
-            "usercount" -> {
-            }
+            "usercount" -> { /* unused */ }
         }
     }
 
@@ -80,7 +86,6 @@ class GlobalMessageObserver(service: ShowdownService)
     private fun processUpdateUser(msg: ServerMessage) {
         var username = msg.nextArg
         service.putSharedData("myusername", username)
-        val userType = username.substring(0, 1)
         username = username.substring(1)
         val isGuest = "0" == msg.nextArg
         var avatar = msg.nextArg
@@ -88,27 +93,34 @@ class GlobalMessageObserver(service: ShowdownService)
         isUserGuest = isGuest
         onUserChanged(username, isGuest, avatar)
 
-        // Update server counts (active battle and active users)
-        requestServerCountsOnly = true
+        // Fetch server counts only — room list is not needed here
+        pendingRoomsQueryPurpose = RoomsQueryPurpose.COUNTS_ONLY
         service.sendGlobalCommand("cmd", "rooms")
-
-        // onSearchBattlesChanged(new String[0], new String[0], new String[0]); TODO Wtf was this call ?
     }
 
     private fun processQueryResponse(msg: ServerMessage) {
         val query = msg.nextArg
         val queryResponse = msg.remainingArgsRaw
         when (query) {
-            "rooms" -> processRoomsQueryResponse(queryResponse)
-            "roomlist" -> processRoomListQueryResponse(queryResponse)
-            "savereplay" -> processSaveReplayQueryResponse(queryResponse)
+            "rooms"       -> processRoomsQueryResponse(queryResponse)
+            "roomlist"    -> processRoomListQueryResponse(queryResponse)
+            "savereplay"  -> processSaveReplayQueryResponse(queryResponse)
             "userdetails" -> processUserDetailsQueryResponse(queryResponse)
-            else -> Timber.w("Command |queryresponse| not handled, type=$query")
+            else          -> Timber.w("Command |queryresponse| not handled, type=$query")
         }
     }
 
-    fun requestRoomsForUi() {
-        requestRoomListForUi = true
+    /**
+     * Called by the UI when the user taps the join-room button. Sends a rooms
+     * query and marks the pending response as needing a full room list so that
+     * [processRoomsQueryResponse] does not short-circuit after reading counts.
+     *
+     * Must be called from the UI thread; the flag is consumed on the WebSocket
+     * message thread. Because WebSocket messages are delivered sequentially and
+     * the send is enqueued before the response can arrive, there is no race.
+     */
+    fun requestRoomList() {
+        pendingRoomsQueryPurpose = RoomsQueryPurpose.FULL_ROOM_LIST
         service.sendGlobalCommand("cmd", "rooms")
     }
 
@@ -117,36 +129,35 @@ class GlobalMessageObserver(service: ShowdownService)
         try {
             val jsonObject = JSONObject(response)
             val userCount = jsonObject.getInt("userCount")
-            service.putSharedData("users", userCount)
             val battleCount = jsonObject.getInt("battleCount")
+            service.putSharedData("users", userCount)
             service.putSharedData("battles", battleCount)
             onUpdateCounts(userCount, battleCount)
-            if (requestServerCountsOnly) {
-                requestServerCountsOnly = false
-                if (!requestRoomListForUi) return  // Only skip room list parsing if UI didn't request it
-                requestRoomListForUi = false
+
+            // Consume the purpose flag before any early return so a subsequent
+            // counts-only query is not accidentally treated as a full list request
+            val purpose = pendingRoomsQueryPurpose
+            pendingRoomsQueryPurpose = RoomsQueryPurpose.COUNTS_ONLY
+
+            if (purpose == RoomsQueryPurpose.COUNTS_ONLY) return
+
+            val officialRooms = jsonObject.getJSONArray("official").let { arr ->
+                (0 until arr.length()).map { i ->
+                    arr.getJSONObject(i).let { room ->
+                        ChatRoomInfo(room.getString("title"), room.getString("desc"), room.getInt("userCount"))
+                    }
+                }
             }
-            var jsonArray = jsonObject.getJSONArray("official")
-            val officialRooms = mutableListOf<ChatRoomInfo>()
-            for (i in 0 until jsonArray.length()) {
-                val roomJson = jsonArray.getJSONObject(i)
-                officialRooms.add(
-                        ChatRoomInfo(roomJson.getString("title"),
-                                roomJson.getString("desc"),
-                                roomJson.getInt("userCount")))
-            }
-            jsonArray = jsonObject.getJSONArray("chat")
-            val chatRooms = mutableListOf<ChatRoomInfo>()
-            for (i in 0 until jsonArray.length()) {
-                val roomJson = jsonArray.getJSONObject(i)
-                chatRooms.add(
-                        ChatRoomInfo(roomJson.getString("title"),
-                                roomJson.getString("desc"),
-                                roomJson.getInt("userCount")))
+            val chatRooms = jsonObject.getJSONArray("chat").let { arr ->
+                (0 until arr.length()).map { i ->
+                    arr.getJSONObject(i).let { room ->
+                        ChatRoomInfo(room.getString("title"), room.getString("desc"), room.getInt("userCount"))
+                    }
+                }
             }
             onAvailableRoomsChanged(officialRooms, chatRooms)
         } catch (e: JSONException) {
-            e.printStackTrace()
+            Timber.e(e, "Failed to parse rooms query response")
         }
     }
 
@@ -158,25 +169,24 @@ class GlobalMessageObserver(service: ShowdownService)
             while (iterator.hasNext()) {
                 val roomId = iterator.next()
                 val roomJson = jsonObject.getJSONObject(roomId)
-                val roomInfo = BattleRoomInfo(roomId, roomJson.getString("p1"),
+                battleRooms.add(
+                    BattleRoomInfo(roomId, roomJson.getString("p1"),
                         roomJson.getString("p2"), roomJson.optInt("minElo", 0))
-                battleRooms.add(roomInfo)
+                )
             }
             onAvailableBattleRoomsChanged(battleRooms)
         } catch (e: JSONException) {
-            e.printStackTrace()
+            Timber.e(e, "Failed to parse room list query response")
             onAvailableBattleRoomsChanged(emptyList())
         }
     }
 
     private fun processSaveReplayQueryResponse(response: String) {
         try {
-            val jsonObject = JSONObject(response)
-            val replayId = jsonObject.optString("id")
-            // val battleLog = jsonObject.optString("log")
+            val replayId = JSONObject(response).optString("id")
             onReplaySaved(replayId, "https://replay.pokemonshowdown.com/$replayId")
         } catch (e: JSONException) {
-            e.printStackTrace()
+            Timber.e(e, "Failed to parse save replay response")
         }
     }
 
@@ -198,7 +208,7 @@ class GlobalMessageObserver(service: ShowdownService)
             }
             onUserDetails(userId, name, online, group, chatRooms, battles)
         } catch (e: JSONException) {
-            e.printStackTrace()
+            Timber.e(e, "Failed to parse user details response")
         }
     }
 
@@ -209,12 +219,10 @@ class GlobalMessageObserver(service: ShowdownService)
         rawText.split("|,").forEach { rawCategory ->
             val catName = rawCategory.substringAfter("|").substringBefore("|")
             val formats = rawCategory.substringAfter(catName).split("|")
-                    .filter { s -> s.isNotBlank() }
+                    .filter { it.isNotBlank() }
                     .mapNotNull { s ->
                         try {
-                            val name = s.substringBefore(",")
-                            val flags = s.substringAfter(",", "").trim().toInt(16)
-                            BattleFormat(name, flags)
+                            BattleFormat(s.substringBefore(","), s.substringAfter(",", "").trim().toInt(16))
                         } catch (e: NumberFormatException) {
                             Timber.w("Skipping malformed format entry: $s")
                             null
@@ -223,9 +231,7 @@ class GlobalMessageObserver(service: ShowdownService)
             BattleFormat.Category().apply {
                 this.formats.addAll(formats)
                 label = catName
-            }.also {
-                categories.add(it)
-            }
+            }.also { categories.add(it) }
         }
         service.putSharedData("formats", categories)
         onBattleFormatsChanged(categories)
@@ -235,18 +241,13 @@ class GlobalMessageObserver(service: ShowdownService)
 
     private fun handleUpdateSearch(msg: ServerMessage) {
         val jsonObject = Utils.jsonObject(msg.remainingArgsRaw) ?: return
-
         val searching = mutableListOf<String>()
-        val searchingJson = jsonObject.optJSONArray("searching")
-        searchingJson?.let {
-            for (i in 0 until searchingJson.length())
-                searching.add(searchingJson.getString(i))
+        jsonObject.optJSONArray("searching")?.let { arr ->
+            for (i in 0 until arr.length()) searching.add(arr.getString(i))
         }
-
         val games = mutableMapOf<String, String>()
-        val gamesJson = jsonObject.optJSONObject("games")
-        gamesJson?.let {
-            gamesJson.keys().forEach { key -> games[key] = gamesJson.getString(key) }
+        jsonObject.optJSONObject("games")?.let { obj ->
+            obj.keys().forEach { key -> games[key] = obj.getString(key) }
         }
         service.putSharedData("searching", searching)
         service.putSharedData("games", games)
@@ -262,28 +263,21 @@ class GlobalMessageObserver(service: ShowdownService)
         if (content != null && (content.startsWith("/raw") || content.startsWith("/html") || content.startsWith("/uhtml")))
             content = "Html messages not supported in pm."
         val message = "$from: $content"
-        val messages = privateMessages.getOrPut(with, { mutableListOf<String>() })
-        messages.add(message)
+        privateMessages.getOrPut(with) { mutableListOf() }.add(message)
         onNewPrivateMessage(with, message)
     }
 
     private fun handleChallenges(message: ServerMessage) {
-        val rawJson: String = message.remainingArgsRaw
+        val jsonObject = Utils.jsonObject(message.remainingArgsRaw)
         var to: String? = null
         var format: String? = null
         val from = mutableMapOf<String, String>()
-
-        val jsonObject = Utils.jsonObject(rawJson)
-        val challengeTo = jsonObject.optJSONObject("challengeTo")
-        challengeTo?.let {
+        jsonObject.optJSONObject("challengeTo")?.let {
             to = it.getString("to")
             format = it.getString("format")
         }
-        val challengesFrom = jsonObject.optJSONObject("challengesFrom")
-        challengesFrom?.let {
-            it.keys().forEach { key ->
-                from[key] = challengesFrom.getString(key)
-            }
+        jsonObject.optJSONObject("challengesFrom")?.let { obj ->
+            obj.keys().forEach { key -> from[key] = obj.getString(key) }
         }
         service.putSharedData("challenge_to", to)
         service.putSharedData("challenge_to_format", format)
@@ -291,9 +285,7 @@ class GlobalMessageObserver(service: ShowdownService)
         onChallengesChange(to, format, from)
     }
 
-    fun getPrivateMessages(with: String): List<String>? {
-        return privateMessages[with]
-    }
+    fun getPrivateMessages(with: String): List<String>? = privateMessages[with]
 
     fun onConnectedToServer() = uiCallbacks?.onConnectedToServer()
     fun onUserChanged(userName: String, isGuest: Boolean, avatarId: String) = uiCallbacks?.onUserChanged(userName, isGuest, avatarId)
@@ -329,4 +321,3 @@ class GlobalMessageObserver(service: ShowdownService)
         fun onNetworkError()
     }
 }
-

@@ -26,6 +26,7 @@ import com.majeur.psclient.util.toId
 
 class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
 
+    // Null-safe: service may not be bound yet when the setter is called
     private val observer get() = service?.chatMessageObserver
 
     private lateinit var inputMethodManager: InputMethodManager
@@ -35,12 +36,15 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     private var _binding: FragmentChatBinding? = null
     private val binding get() = _binding!!
 
+    // Backing field kept separately so we can restore it into the observer
+    // after a service reconnect, without triggering the setter side-effects
+    // while service is still null
     private var _observedRoomId: String? = null
     var observedRoomId: String?
         get() = _observedRoomId
-        set(observedRoomId) {
-            _observedRoomId = observedRoomId
-            observer?.observedRoomId = observedRoomId
+        set(value) {
+            _observedRoomId = value
+            observer?.observedRoomId = value
         }
 
     override fun onAttach(context: Context) {
@@ -69,11 +73,17 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         }
         binding.joinButton.setOnClickListener {
             if (service?.isConnected != true) return@setOnClickListener
-            if (observer?.roomJoined == true) service?.sendRoomCommand(observedRoomId, "leave")
-            else service?.globalMessageObserver?.requestRoomsForUi()
+            if (observer?.roomJoined == true) {
+                service?.sendRoomCommand(observedRoomId, "leave")
+            } else {
+                // Request the full room list from the server; GlobalMessageObserver
+                // marks the pending response so it is not discarded as counts-only
+                service?.globalMessageObserver?.requestRoomList()
+            }
         }
-        binding.usersCount.setOnClickListener { v: View ->
-            val adapter = ArrayAdapter(requireActivity(), android.R.layout.simple_list_item_1, observer?.users ?: emptyList())
+        binding.usersCount.setOnClickListener {
+            val users = observer?.users ?: emptyList()
+            val adapter = ArrayAdapter(requireActivity(), android.R.layout.simple_list_item_1, users)
             AlertDialog.Builder(requireActivity())
                     .setTitle("Users")
                     .setAdapter(adapter) { dialog: DialogInterface, pos: Int ->
@@ -136,8 +146,9 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     override fun onServiceBound(service: ShowdownService) {
         super.onServiceBound(service)
         service.chatMessageObserver.uiCallbacks = this
-        // Restore observed room if already set
-        if (_observedRoomId != null) service.chatMessageObserver.observedRoomId = _observedRoomId
+        // Restore the observed room into the freshly bound observer so that
+        // messages keep routing correctly after a reconnect or config change
+        service.chatMessageObserver.observedRoomId = _observedRoomId
     }
 
     override fun onServiceWillUnbound(service: ShowdownService) {
@@ -146,8 +157,9 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     }
 
     fun onAvailableRoomsChanged(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>) {
-        if (parentFragmentManager.findFragmentByTag(JoinChatRoomDialog.FRAGMENT_TAG) == null)
-            JoinChatRoomDialog.newInstance(officialRooms, chatRooms)
+        if (!isAdded) return
+        if (parentFragmentManager.findFragmentByTag(JoinChatRoomDialog.FRAGMENT_TAG) != null) return
+        JoinChatRoomDialog.newInstance(officialRooms, chatRooms)
                 .show(parentFragmentManager, JoinChatRoomDialog.FRAGMENT_TAG)
     }
 
@@ -159,6 +171,7 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         binding.chatLogContainer.post { binding.chatLogContainer.fullScroll(View.FOCUS_DOWN) }
     }
 
+    // ── ChatRoomMessageObserver.UiCallbacks ──────────────────────────────
 
     override fun onRoomInit() {
         setUiState(roomJoined = true)
@@ -181,12 +194,13 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         val l = binding.chatLog.length()
         binding.chatLog.append("\u200C")
         binding.chatLog.editableText.setSpan(mark, l, l + 1, Spanned.SPAN_MARK_MARK)
-        Html.fromHtml(html,
+        Html.fromHtml(
+                html,
                 Html.FROM_HTML_MODE_COMPACT,
                 glideHelper.getHtmlImageGetter(assetLoader, binding.chatLog.width),
                 Callback { spanned: Spanned? ->
                     val at = binding.chatLog.editableText.getSpanStart(mark)
-                    if (at == -1) return@Callback // Check if text has been cleared
+                    if (at == -1) return@Callback // View was cleared while loading
                     val fullScrolled = Utils.fullScrolled(binding.chatLogContainer)
                     binding.chatLog.editableText
                             .insert(at, "\n")
