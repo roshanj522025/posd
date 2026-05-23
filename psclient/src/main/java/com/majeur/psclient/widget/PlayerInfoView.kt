@@ -94,8 +94,9 @@ class PlayerInfoView @JvmOverloads constructor(context: Context, attrs: Attribut
     fun appendPokemon(pokemon: BasePokemon, dexIcon: Drawable) {
         if (!pokemonIds.addIfNotIn(pokemon.baseSpecies.toId())) return
         val i = if (isGravityRight) SUFFIX_OFFSET + MAX_TEAM_SIZE - pokemonIds.size else spannableBuilder.length - MAX_TEAM_SIZE - SUFFIX_OFFSET + pokemonIds.size - 1
-        val previousSpan = spannableBuilder.getSpans(i, i + 1, ImageSpan::class.java)[0]
-        spannableBuilder.removeSpan(previousSpan)
+        val spans = spannableBuilder.getSpans(i, i + 1, ImageSpan::class.java)
+        if (spans.isEmpty()) return
+        spannableBuilder.removeSpan(spans[0])
         val aspectRatio = dexIcon.intrinsicWidth / dexIcon.intrinsicHeight.toFloat()
         dexIcon.setBounds(0, 0, (aspectRatio * dexIconSize).roundToInt(), dexIconSize)
         spannableBuilder.setSpan(ImageSpan(dexIcon), i, i + 1, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -109,8 +110,9 @@ class PlayerInfoView @JvmOverloads constructor(context: Context, attrs: Attribut
         }
         val index = pokemonIds.indexOf(pokemon.baseSpecies.toId())
         val i = if (isGravityRight) SUFFIX_OFFSET + MAX_TEAM_SIZE - (index + 1) else spannableBuilder.length - MAX_TEAM_SIZE - SUFFIX_OFFSET + index
-        val previousSpan = spannableBuilder.getSpans(i, i + 1, ImageSpan::class.java)[0]
-        spannableBuilder.removeSpan(previousSpan)
+        val spans = spannableBuilder.getSpans(i, i + 1, ImageSpan::class.java)
+        if (spans.isEmpty()) return
+        spannableBuilder.removeSpan(spans[0])
         val aspectRatio = dexIcon.intrinsicWidth / dexIcon.intrinsicHeight.toFloat()
         dexIcon.setBounds(0, 0, (aspectRatio * dexIconSize).roundToInt(), dexIconSize)
         spannableBuilder.setSpan(ImageSpan(dexIcon), i, i + 1, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
