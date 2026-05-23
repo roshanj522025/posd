@@ -131,7 +131,7 @@ class StatusView(context: Context?) : View(context) {
                 drawingRect.height() + paddingTop + paddingBottom)
     }
 
-    override fun onDraw(canvas: Canvas?) {
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         drawingRect.setEmpty()
         drawContent(canvas, drawingRect)

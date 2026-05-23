@@ -22,7 +22,7 @@ import com.majeur.psclient.util.toId
 import kotlin.math.roundToInt
 
 @SuppressLint("RtlHardcoded")
-class PlayerInfoView @JvmOverloads constructor(context: Context?, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : AppCompatTextView(context, attrs, defStyleAttr) {
+class PlayerInfoView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : AppCompatTextView(context, attrs, defStyleAttr) {
 
     private val dexIconSize = sp(16f)
     private val spannableBuilder: SpannableStringBuilder

@@ -38,7 +38,7 @@ class SearchBattleDialog : BottomSheetDialogFragment(), AdapterView.OnItemClickL
         get() = homeFragment.mainActivity.service?.getSharedData<List<BattleFormat.Category>>("formats")
 
     private val bottomSheetBehavior
-        get() = BottomSheetBehavior.from(dialog!!.findViewById<View>(R.id.design_bottom_sheet))
+        get() = BottomSheetBehavior.from(dialog!!.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,7 +54,7 @@ class SearchBattleDialog : BottomSheetDialogFragment(), AdapterView.OnItemClickL
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val dialog = super.onCreateDialog(savedInstanceState) as BottomSheetDialog
         dialog.setOnShowListener {
-            val sheet = dialog.findViewById<View>(R.id.design_bottom_sheet) as FrameLayout
+            val sheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet) as FrameLayout
             val layoutParams = sheet.layoutParams ?: FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 0)
             val verticalInsets = ViewCompat.getRootWindowInsets(sheet)?.stableInsets?.run { top + bottom } ?: 0
             layoutParams.height = dialog.window?.decorView?.run { height - verticalInsets }

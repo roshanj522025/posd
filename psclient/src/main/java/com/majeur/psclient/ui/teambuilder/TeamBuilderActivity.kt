@@ -60,7 +60,7 @@ class TeamBuilderActivity : AppCompatActivity() {
                 TeamFragment.ARG_FORMATS to formats
         ))
         navController.addOnDestinationChangedListener { controller, destination, _ ->
-            val isStartDestination = controller.graph.startDestination == destination.id
+            val isStartDestination = controller.graph.startDestinationId == destination.id
             onBackPressedCallback.isEnabled = isStartDestination
         }
         setupActionBarWithNavController(navController)
