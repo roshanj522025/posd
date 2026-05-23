@@ -209,7 +209,8 @@ class GlobalMessageObserver(service: ShowdownService)
                             val flags = s.substringAfter(",", "").trim().toInt(16)
                             BattleFormat(name, flags)
                         } catch (e: NumberFormatException) {
-                            Timber.w("Skipping malformed format entry: \'$s\'")                            null
+                            Timber.w("Skipping malformed format entry: $s")
+                            null
                         }
                     }
             BattleFormat.Category().apply {
