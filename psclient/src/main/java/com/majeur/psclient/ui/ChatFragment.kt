@@ -26,7 +26,7 @@ import com.majeur.psclient.util.toId
 
 class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
 
-    private val observer get() = service!!.chatMessageObserver
+    private val observer get() = service?.chatMessageObserver
 
     private lateinit var inputMethodManager: InputMethodManager
     private lateinit var glideHelper: GlideHelper
@@ -40,7 +40,7 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         get() = _observedRoomId
         set(observedRoomId) {
             _observedRoomId = observedRoomId
-            observer.observedRoomId = observedRoomId
+            observer?.observedRoomId = observedRoomId
         }
 
     override fun onAttach(context: Context) {
@@ -69,11 +69,11 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         }
         binding.joinButton.setOnClickListener {
             if (service?.isConnected != true) return@setOnClickListener
-            if (observer.roomJoined) service?.sendRoomCommand(observedRoomId, "leave")
-            else service?.sendGlobalCommand("cmd", "rooms")
+            if (observer?.roomJoined == true) service?.sendRoomCommand(observedRoomId, "leave")
+            else service?.globalMessageObserver?.requestRoomsForUi()
         }
         binding.usersCount.setOnClickListener { v: View ->
-            val adapter = ArrayAdapter(requireActivity(), android.R.layout.simple_list_item_1, observer.users)
+            val adapter = ArrayAdapter(requireActivity(), android.R.layout.simple_list_item_1, observer?.users ?: emptyList())
             AlertDialog.Builder(requireActivity())
                     .setTitle("Users")
                     .setAdapter(adapter) { dialog: DialogInterface, pos: Int ->
@@ -136,6 +136,8 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     override fun onServiceBound(service: ShowdownService) {
         super.onServiceBound(service)
         service.chatMessageObserver.uiCallbacks = this
+        // Restore observed room if already set
+        if (_observedRoomId != null) service.chatMessageObserver.observedRoomId = _observedRoomId
     }
 
     override fun onServiceWillUnbound(service: ShowdownService) {
@@ -144,9 +146,9 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     }
 
     fun onAvailableRoomsChanged(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>) {
-        if (requireFragmentManager().findFragmentByTag(JoinChatRoomDialog.FRAGMENT_TAG) == null)
+        if (parentFragmentManager.findFragmentByTag(JoinChatRoomDialog.FRAGMENT_TAG) == null)
             JoinChatRoomDialog.newInstance(officialRooms, chatRooms)
-                .show(requireFragmentManager(), JoinChatRoomDialog.FRAGMENT_TAG)
+                .show(parentFragmentManager, JoinChatRoomDialog.FRAGMENT_TAG)
     }
 
     private fun notifyNewMessageReceived() {

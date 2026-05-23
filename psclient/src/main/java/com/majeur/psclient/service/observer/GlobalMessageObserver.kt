@@ -23,6 +23,7 @@ class GlobalMessageObserver(service: ShowdownService)
         private set
 
     private var requestServerCountsOnly = false
+    private var requestRoomListForUi = false
     private val privateMessages = mutableMapOf<String, MutableList<String>>()
 
     override fun onUiCallbacksAttached() {
@@ -106,6 +107,11 @@ class GlobalMessageObserver(service: ShowdownService)
         }
     }
 
+    fun requestRoomsForUi() {
+        requestRoomListForUi = true
+        service.sendGlobalCommand("cmd", "rooms")
+    }
+
     private fun processRoomsQueryResponse(response: String) {
         if (response == "null") return
         try {
@@ -117,7 +123,8 @@ class GlobalMessageObserver(service: ShowdownService)
             onUpdateCounts(userCount, battleCount)
             if (requestServerCountsOnly) {
                 requestServerCountsOnly = false
-                return
+                if (!requestRoomListForUi) return  // Only skip room list parsing if UI didn't request it
+                requestRoomListForUi = false
             }
             var jsonArray = jsonObject.getJSONArray("official")
             val officialRooms = mutableListOf<ChatRoomInfo>()
