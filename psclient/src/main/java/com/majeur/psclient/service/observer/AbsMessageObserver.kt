@@ -18,7 +18,9 @@ abstract class AbsMessageObserver<C : AbsMessageObserver.UiCallbacks>(
     var uiCallbacks: C? = null
         set(value) {
             field = value
-            if (value != null) uiHandler.post { onUiCallbacksAttached() }
+            // onUiCallbacksAttached is always called from the main thread
+            // (set in onServiceBound). Call synchronously — no post needed.
+            if (value != null) onUiCallbacksAttached()
         }
 
     protected abstract fun onUiCallbacksAttached()

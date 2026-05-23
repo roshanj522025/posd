@@ -116,7 +116,7 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
                 sendButton.isEnabled = true
                 sendButton.drawable.alpha = 255
                 joinButton.setImageResource(R.drawable.ic_exit)
-                chatLog.gravity = Gravity.START
+                chatLog.gravity = Gravity.START or Gravity.TOP
                 chatLog.setText("", TextView.BufferType.EDITABLE)
             }
         } else {
@@ -133,8 +133,11 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
                 // Cancel any in-progress animation before modifying text
                 chatLog.animate().cancel()
                 chatLog.alpha = 1f
-                chatLog.text = "\n\n\n\n\n\n\n\n\n\nTap the join button to join a room"
-                chatLog.gravity = Gravity.CENTER_HORIZONTAL
+                // Must use EDITABLE buffer type — plain assignment switches buffer
+                // type away from Editable and breaks append() on next room join
+                chatLog.setText("\n\n\n\n\n\n\n\n\n\nTap the join button to join a room",
+                    TextView.BufferType.EDITABLE)
+                chatLog.gravity = Gravity.CENTER_HORIZONTAL or Gravity.CENTER_VERTICAL
             }
             inputMethodManager.hideSoftInputFromWindow(binding.messageInput.windowToken, 0)
         }
