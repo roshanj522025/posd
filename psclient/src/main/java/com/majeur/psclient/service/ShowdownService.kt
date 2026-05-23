@@ -28,10 +28,18 @@ class ShowdownService : Service() {
         private const val WS_CLOSE_GOING_AWAY = 1001
         private const val WS_CLOSE_NETWORK_ERROR = 4001
         private const val SHOWDOWN_SOCKET_URL = "wss://sim3.psim.us/showdown/websocket"
+        private const val RECONNECT_DELAY_INITIAL = 1_000L   // 1 s
+        private const val RECONNECT_DELAY_CAP     = 15_000L  // 15 s — matches PS official client
     }
 
     internal lateinit var okHttpClient: OkHttpClient
         private set
+
+    // Reconnection state — mirrors PS official client logic
+    private var reconnectDelay = RECONNECT_DELAY_INITIAL
+    private var shouldReconnect = false
+    private var reconnectRunnable: Runnable? = null
+    private val sendQueue = mutableListOf<String>() // messages queued while disconnected
 
     private lateinit var binder: Binder
     private lateinit var uiHandler: Handler
@@ -99,11 +107,15 @@ class ShowdownService : Service() {
     override fun onDestroy() {
         Timber.d("(${hashCode()}) Lifecycle: onDestroy")
         super.onDestroy()
+        shouldReconnect = false
+        cancelPendingReconnect()
         if (isConnected) webSocket?.close(WS_CLOSE_GOING_AWAY, null)
     }
 
     fun connectToServer() {
         if (isConnected) return
+        shouldReconnect = true
+        reconnectDelay = RECONNECT_DELAY_INITIAL
         Timber.d("Attempting to open WS connection.")
         val request = Request.Builder().url(SHOWDOWN_SOCKET_URL).build()
         webSocket = okHttpClient.newWebSocket(request, webSocketListener)
@@ -115,10 +127,36 @@ class ShowdownService : Service() {
     }
 
     fun disconnectFromServer() {
+        shouldReconnect = false
+        cancelPendingReconnect()
+        sendQueue.clear()
         if (!isConnected) return
         Timber.d("Attempting to close WS connection.")
         webSocket?.close(WS_CLOSE_NORMAL, "Normal closure")
         sharedData.clear()
+    }
+
+    private fun scheduleReconnect() {
+        if (!shouldReconnect) return
+        cancelPendingReconnect()
+        Timber.d("Scheduling reconnect in ${reconnectDelay}ms")
+        val r = Runnable {
+            reconnectRunnable = null
+            if (!isConnected && shouldReconnect) {
+                Timber.d("Attempting reconnect...")
+                val request = Request.Builder().url(SHOWDOWN_SOCKET_URL).build()
+                webSocket = okHttpClient.newWebSocket(request, webSocketListener)
+            }
+        }
+        reconnectRunnable = r
+        uiHandler.postDelayed(r, reconnectDelay)
+        // Exponential backoff capped at 15 s
+        reconnectDelay = minOf(reconnectDelay * 2, RECONNECT_DELAY_CAP)
+    }
+
+    private fun cancelPendingReconnect() {
+        reconnectRunnable?.let { uiHandler.removeCallbacks(it) }
+        reconnectRunnable = null
     }
 
     fun sendTrnMessage(userName: String, assertion: String) = sendGlobalCommand("trn", userName, "0", assertion)
@@ -138,7 +176,8 @@ class ShowdownService : Service() {
             Timber.tag("WebSocket[SEND]").i(message)
             webSocket?.send(message)
         } else {
-            Timber.w("WebSocket not opened. Ignoring message: $message")
+            Timber.w("WebSocket not opened. Queuing message: $message")
+            sendQueue.add(message)
         }
     }
 
@@ -175,8 +214,18 @@ class ShowdownService : Service() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             Timber.tag("WebSocket[OPEN]").i("Host: ${response.request.url.host}")
             isConnected = true
+            reconnectDelay = RECONNECT_DELAY_INITIAL // reset backoff on successful connect
             uiHandler.post {
+                // Flush any messages that were queued while disconnected
+                val queued = sendQueue.toList()
+                sendQueue.clear()
+                queued.forEach { webSocket.send(it) }
                 dispatchMessage(ServerMessage("lobby", "|connected|"))
+                // Re-join rooms that were active before disconnect
+                val activeBattleRoom = battleMessageObserver.observedRoomId
+                val activeChatRoom = chatMessageObserver.observedRoomId
+                if (activeBattleRoom != null) sendGlobalCommand("join", activeBattleRoom)
+                if (activeChatRoom != null) sendGlobalCommand("join", activeChatRoom)
             }
         }
 
@@ -197,6 +246,7 @@ class ShowdownService : Service() {
             this@ShowdownService.webSocket = null
             uiHandler.post {
                 dispatchMessage(ServerMessage("lobby", "|networkerror|"))
+                scheduleReconnect()
             }
         }
 
@@ -204,6 +254,9 @@ class ShowdownService : Service() {
             Timber.tag("WebSocket[CLOSED]").i(reason)
             isConnected = false
             this@ShowdownService.webSocket = null
+            if (code != WS_CLOSE_NORMAL && code != WS_CLOSE_GOING_AWAY) {
+                uiHandler.post { scheduleReconnect() }
+            }
         }
     }
 
