@@ -89,8 +89,7 @@ class PSClient : Application() {
                 setTextColor(0xFFFFCC00.toInt())
                 setBackgroundColor(0xFF1A1A1A.toInt())
                 setPadding(16, 16, 16, 16)
-                isTextSelectable = true
-            })
+            }).also { it.setTextIsSelectable(true) })
             root.addView(scroll)
 
             root.addView(Button(this).apply {
