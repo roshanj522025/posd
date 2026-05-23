@@ -1,6 +1,9 @@
 package com.majeur.psclient
 
 import android.app.Application
+import com.majeur.psclient.ui.DebugConsoleActivity
+import android.os.Handler
+import android.os.Looper
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -25,6 +28,33 @@ class PSClient : Application() {
             Timber.plant(DebugTree())
         }
         installCrashHandler()
+        installMainThreadWatchdog()
+    }
+
+    /**
+     * Posts a sentinel to the main thread every 3 seconds.
+     * If it doesn't run within 5 seconds, we log a stack dump to the debug console.
+     * This catches ANR-style freezes that don't throw exceptions.
+     */
+    private fun installMainThreadWatchdog() {
+        val mainHandler = Handler(Looper.getMainLooper())
+        val bgThread = Thread {
+            while (true) {
+                Thread.sleep(3_000)
+                var responded = false
+                mainHandler.post { responded = true }
+                Thread.sleep(5_000)
+                if (!responded) {
+                    val mainThread = Looper.getMainLooper().thread
+                    val trace = mainThread.stackTrace
+                        .joinToString("\n") { "  at \${it.className}.\${it.methodName}(\${it.fileName}:\${it.lineNumber})" }
+                    DebugConsoleActivity.logError("⚠ MAIN THREAD BLOCKED >5s:\n\$trace")
+                }
+            }
+        }
+        bgThread.isDaemon = true
+        bgThread.name = "MainThreadWatchdog"
+        bgThread.start()
     }
 
     private fun installCrashHandler() {

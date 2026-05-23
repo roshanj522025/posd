@@ -187,54 +187,76 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     // ── ChatRoomMessageObserver.UiCallbacks ──────────────────────────────
 
     override fun onRoomInit() {
-        setUiState(roomJoined = true)
+        try {
+            setUiState(roomJoined = true)
+        } catch (e: Exception) {
+            DebugConsoleActivity.logError("onRoomInit CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
+        }
     }
 
     override fun onRoomDeInit() {
-        _observedRoomId = null
-        observer?.observedRoomId = null
-        setUiState(roomJoined = false)
+        try {
+            _observedRoomId = null
+            observer?.observedRoomId = null
+            setUiState(roomJoined = false)
+        } catch (e: Exception) {
+            DebugConsoleActivity.logError("onRoomDeInit CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
+        }
     }
 
     override fun onPrintText(text: CharSequence) {
-        val b = _binding ?: return  // fragment view may be destroyed
-        val fullScrolled = Utils.fullScrolled(b.chatLogContainer)
-        if (b.chatLog.length() > 0) b.chatLog.append("\n")
-        b.chatLog.append(text)
-        notifyNewMessageReceived()
-        if (fullScrolled) postFullScroll()
+        try {
+            val b = _binding ?: return
+            val fullScrolled = Utils.fullScrolled(b.chatLogContainer)
+            if (b.chatLog.length() > 0) b.chatLog.append("\n")
+            b.chatLog.append(text)
+            notifyNewMessageReceived()
+            if (fullScrolled) postFullScroll()
+        } catch (e: Exception) {
+            DebugConsoleActivity.logError("onPrintText CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
+        }
     }
 
     override fun onPrintHtml(html: String) {
-        val b = _binding ?: return  // fragment view destroyed
-        val mark = Any()
-        val l = b.chatLog.length()
-        b.chatLog.append("\u200C")
-        b.chatLog.editableText.setSpan(mark, l, l + 1, Spanned.SPAN_MARK_MARK)
-        val imgWidth = if (b.chatLog.width > 0) b.chatLog.width
-                       else resources.displayMetrics.widthPixels
-        Html.fromHtml(
-                html,
-                Html.FROM_HTML_MODE_COMPACT,
-                glideHelper.getHtmlImageGetter(assetLoader, imgWidth),
-                Callback { spanned: Spanned? ->
-                    val b2 = _binding ?: return@Callback  // view destroyed while image was loading
-                    val at = b2.chatLog.editableText.getSpanStart(mark)
-                    if (at == -1) return@Callback  // text was cleared while loading
-                    val fullScrolled = Utils.fullScrolled(b2.chatLogContainer)
-                    b2.chatLog.editableText
-                            .insert(at, "\n")
-                            .insert(at + 1, spanned)
-                    notifyNewMessageReceived()
-                    if (fullScrolled) postFullScroll()
-                })
+        try {
+            val b = _binding ?: return
+            val mark = Any()
+            val l = b.chatLog.length()
+            b.chatLog.append("\u200C")
+            b.chatLog.editableText.setSpan(mark, l, l + 1, Spanned.SPAN_MARK_MARK)
+            val imgWidth = if (b.chatLog.width > 0) b.chatLog.width
+                           else resources.displayMetrics.widthPixels
+            Html.fromHtml(
+                    html,
+                    Html.FROM_HTML_MODE_COMPACT,
+                    glideHelper.getHtmlImageGetter(assetLoader, imgWidth),
+                    Callback { spanned: Spanned? ->
+                        try {
+                            val b2 = _binding ?: return@Callback
+                            val at = b2.chatLog.editableText.getSpanStart(mark)
+                            if (at == -1) return@Callback
+                            val fullScrolled = Utils.fullScrolled(b2.chatLogContainer)
+                            b2.chatLog.editableText
+                                    .insert(at, "\n")
+                                    .insert(at + 1, spanned)
+                            notifyNewMessageReceived()
+                            if (fullScrolled) postFullScroll()
+                        } catch (e: Exception) {
+                            DebugConsoleActivity.logError("onPrintHtml callback CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
+                        }
+                    })
+        } catch (e: Exception) {
+            DebugConsoleActivity.logError("onPrintHtml CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
+        }
     }
 
     override fun onRoomTitleChanged(title: String) {
-        binding.roomTitle.text = title
+        try { _binding?.roomTitle?.text = title }
+        catch (e: Exception) { DebugConsoleActivity.logError("onRoomTitleChanged CRASH: ${e.message}") }
     }
 
     override fun onUpdateUsers(users: List<String>) {
-        binding.usersCount.text = "${users.size} users"
+        try { _binding?.usersCount?.text = "${users.size} users" }
+        catch (e: Exception) { DebugConsoleActivity.logError("onUpdateUsers CRASH: ${e.message}") }
     }
 }
