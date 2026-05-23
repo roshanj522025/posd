@@ -1,15 +1,11 @@
 package com.majeur.psclient.service.observer
 
-import android.os.Handler
-import android.os.Looper
 import com.majeur.psclient.service.ServerMessage
 import com.majeur.psclient.service.ShowdownService
 
 abstract class AbsMessageObserver<C : AbsMessageObserver.UiCallbacks>(
         val service: ShowdownService
 ) {
-
-    private val uiHandler = Handler(Looper.getMainLooper())
 
     var uiCallbacks: C? = null
         set(value) {
@@ -25,15 +21,18 @@ abstract class AbsMessageObserver<C : AbsMessageObserver.UiCallbacks>(
 
     open val interceptCommandAfter = emptySet<String>()
 
+    // ShowdownService already dispatches all messages on the main thread via
+    // uiHandler.post{} in its WebSocketListener.onMessage. A second post here
+    // would break the ordering guarantee that GlobalMessageObserver's
+    // interceptCommandBefore callbacks (which set observedRoomId on the chat/battle
+    // observers) run before the chat/battle observers process the same message.
     fun postMessage(message: ServerMessage, forcePost: Boolean = false) {
         if (forcePost || observedRoomId == message.roomId) {
-            uiHandler.post { onMessage(message) }
+            onMessage(message)
         }
     }
 
     protected abstract fun onMessage(message: ServerMessage)
 
-    interface UiCallbacks {
-
-    }
+    interface UiCallbacks
 }
