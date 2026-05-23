@@ -11,6 +11,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.TextView
+import android.widget.Toast
 import com.majeur.psclient.R
 import com.majeur.psclient.databinding.FragmentChatBinding
 import com.majeur.psclient.io.AssetLoader
@@ -72,13 +73,16 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
             animate().duration = 200
         }
         binding.joinButton.setOnClickListener {
-            if (service?.isConnected != true) return@setOnClickListener
-            if (observer?.roomJoined == true) {
-                service?.sendRoomCommand(observedRoomId, "leave")
-            } else {
-                // Request the full room list from the server; GlobalMessageObserver
-                // marks the pending response so it is not discarded as counts-only
-                service?.globalMessageObserver?.requestRoomList()
+            when {
+                service == null || service?.isConnected != true ->
+                    Toast.makeText(requireContext(), "Not connected to Showdown", Toast.LENGTH_SHORT).show()
+                observer?.roomJoined == true ->
+                    service?.sendRoomCommand(observedRoomId, "leave")
+                else -> {
+                    // Request the full room list from the server; GlobalMessageObserver
+                    // marks the pending response so it is not discarded as counts-only
+                    service?.globalMessageObserver?.requestRoomList()
+                }
             }
         }
         binding.usersCount.setOnClickListener {

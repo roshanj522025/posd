@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 
 class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, View.OnClickListener {
 
-    private val observer get() = service!!.battleMessageObserver
+    private val observer get() = service?.battleMessageObserver
 
     private lateinit var glideHelper: GlideHelper
     private lateinit var audioManager: BattleAudioManager
@@ -68,11 +68,11 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         get() = _observedRoomId
         set(observedRoomId) {
             _observedRoomId = observedRoomId
-            observer.observedRoomId = observedRoomId
+            observer?.observedRoomId = observedRoomId
         }
 
-    val battleRunning get() = observer.battleRunning
-    val isReplay get() = observer.isReplay
+    val battleRunning get() = observer?.battleRunning == true
+    val isReplay get() = observer?.isReplay == true
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
@@ -146,7 +146,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         // Pause replay if user switches away to another fragment
         // Do a isResumed check, because this method gets triggered on activity start, and
         // battleType is not yet available at that point
-        if (super.isResumed() && hidden && observer.isReplay) pauseReplay()
+        if (super.isResumed() && hidden && observer?.isReplay == true) pauseReplay()
     }
 
     override fun onServiceBound(service: ShowdownService) {
