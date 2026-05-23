@@ -125,13 +125,15 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
                 sendButton.drawable.alpha = 128
                 joinButton.setImageResource(R.drawable.ic_enter)
                 joinButton.requestFocus()
-                chatLog.animate().alpha(0f).withEndAction {
-                    _binding ?: return@withEndAction  // guard: view may be destroyed
-                    chatLog.setText("\n\n\n\n\n\n\n\n\n\nTap the join button to join a room",
-                        TextView.BufferType.EDITABLE)
-                    chatLog.gravity = Gravity.CENTER_HORIZONTAL
-                    chatLog.animate().alpha(1f).withEndAction(null).start()
-                }.start()
+                // Cancel any in-flight animation, clear immediately, then fade in.
+                // Chained animations with withEndAction risk running on a stale binding
+                // after the view is destroyed (e.g. config change while leaving a room).
+                chatLog.animate().cancel()
+                chatLog.alpha = 0f
+                chatLog.gravity = Gravity.CENTER_HORIZONTAL
+                chatLog.setText("\n\n\n\n\n\n\n\n\n\nTap the join button to join a room",
+                    TextView.BufferType.EDITABLE)
+                chatLog.animate().alpha(1f).setDuration(200).withEndAction(null).start()
             }
             inputMethodManager.hideSoftInputFromWindow(binding.messageInput.windowToken, 0)
         }
@@ -178,8 +180,11 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     }
 
     override fun onRoomDeInit() {
+        // Clear backing field directly — do NOT touch observer?.observedRoomId here.
+        // RoomMessageObserver already cleared its own state when it processed |deinit|.
+        // Setting observedRoomId = null on the observer again would re-trigger onRoomDeInit,
+        // causing a double-call loop that freezes the UI for ~2 seconds.
         _observedRoomId = null
-        observer?.observedRoomId = null
         setUiState(roomJoined = false)
     }
 
