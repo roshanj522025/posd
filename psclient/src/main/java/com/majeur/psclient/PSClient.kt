@@ -82,14 +82,15 @@ class PSClient : Application() {
             val scroll = ScrollView(this)
             val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
             scroll.layoutParams = lp
-            scroll.addView(TextView(this).apply {
-                text = trace
-                textSize = 10f
-                typeface = Typeface.MONOSPACE
-                setTextColor(0xFFFFCC00.toInt())
-                setBackgroundColor(0xFF1A1A1A.toInt())
-                setPadding(16, 16, 16, 16)
-            }).also { it.setTextIsSelectable(true) })
+            val traceView = TextView(this)
+            traceView.text = trace
+            traceView.textSize = 10f
+            traceView.typeface = Typeface.MONOSPACE
+            traceView.setTextColor(0xFFFFCC00.toInt())
+            traceView.setBackgroundColor(0xFF1A1A1A.toInt())
+            traceView.setPadding(16, 16, 16, 16)
+            traceView.setTextIsSelectable(true)
+            scroll.addView(traceView)
             root.addView(scroll)
 
             root.addView(Button(this).apply {
