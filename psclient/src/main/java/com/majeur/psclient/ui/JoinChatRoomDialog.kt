@@ -16,8 +16,6 @@ import com.majeur.psclient.databinding.ListItemRoomBinding
 import com.majeur.psclient.model.ChatRoomInfo
 import com.majeur.psclient.util.*
 import java.util.*
-import kotlin.collections.ArrayList
-
 
 class JoinChatRoomDialog : BottomSheetDialogFragment() {
 
@@ -27,10 +25,14 @@ class JoinChatRoomDialog : BottomSheetDialogFragment() {
     private var _binding: DialogJoinRoomBinding? = null
     private val binding get() = _binding!!
 
+    // Access service through the activity the same way the rest of the UI does
+    private val service get() = (requireActivity() as MainActivity).service
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         officialRooms = requireArguments().getParcelableArrayList<ChatRoomInfo>(ARG_OFFICIAL_ROOMS)!!
-        chatRooms = requireArguments().getParcelableArrayList<ChatRoomInfo>(ARG_CHAT_ROOMS)!!.sortedBy { -it.userCount }
+        chatRooms = requireArguments().getParcelableArrayList<ChatRoomInfo>(ARG_CHAT_ROOMS)!!
+                .sortedByDescending { it.userCount }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -40,23 +42,26 @@ class JoinChatRoomDialog : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
         binding.list.apply {
             adapter = listAdapter
             setOnTouchListener(NestedScrollLikeTouchListener())
             onItemClickListener = AdapterView.OnItemClickListener { _, _, index, _ ->
-                val roomInfo = listAdapter.getItem(index) as ChatRoomInfo
+                val roomInfo = listAdapter.getItem(index) as? ChatRoomInfo ?: return@OnItemClickListener
                 joinRoom(roomInfo.name)
             }
         }
+
         val footerBinding = ListFooterOtherRoomBinding.inflate(layoutInflater, binding.list, false)
-        footerBinding.button.setOnClickListener(View.OnClickListener {
-            val input = footerBinding.roomNameInput.text.toString()
+        footerBinding.button.isEnabled = false
+        footerBinding.button.setOnClickListener {
+            val input = footerBinding.roomNameInput.text.toString().trim()
             if (input.startsWith("battle-", ignoreCase = true)) {
                 Toast.makeText(context, "You cannot join a battle from here", Toast.LENGTH_LONG).show()
-                return@OnClickListener
+                return@setOnClickListener
             }
             joinRoom(input)
-        })
+        }
         footerBinding.roomNameInput.addTextChangedListener(object : SimpleTextWatcher() {
             override fun afterTextChanged(editable: Editable) {
                 footerBinding.button.isEnabled = editable.isNotEmpty()
@@ -65,84 +70,87 @@ class JoinChatRoomDialog : BottomSheetDialogFragment() {
         binding.list.addFooterView(footerBinding.root)
     }
 
-    private fun joinRoom(roomId: String) {
-        val regex = "[^a-z0-9-]".toRegex()
-        roomId.toLowerCase(Locale.ROOT).replace(regex, "").let {
-            (requireActivity() as MainActivity).service?.sendGlobalCommand("join", roomId)
-            dismiss()
-        }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
+    private fun joinRoom(roomName: String) {
+        // Normalise to a valid PS room ID before sending
+        val roomId = roomName.lowercase(Locale.ROOT).replace("[^a-z0-9-]".toRegex(), "")
+        if (roomId.isEmpty()) return
+        service?.sendGlobalCommand("join", roomId)
+        dismiss()
     }
 
     private val listAdapter: ListAdapter = object : BaseAdapter() {
 
-        private val VIEW_TYPE_HEADER = 0
+        private val VIEW_TYPE_HEADER  = 0
         private val VIEW_TYPE_REGULAR = 1
 
         override fun getCount() = 2 + officialRooms.size + chatRooms.size
-
         override fun isEnabled(position: Int) = getItemViewType(position) == VIEW_TYPE_REGULAR
-
         override fun areAllItemsEnabled() = false
-
         override fun getViewTypeCount() = 2
 
-        override fun getItemViewType(position: Int): Int {
-            return if (position == 0 || position == officialRooms.size + 1) VIEW_TYPE_HEADER else VIEW_TYPE_REGULAR
-        }
+        override fun getItemViewType(position: Int) =
+                if (position == 0 || position == officialRooms.size + 1) VIEW_TYPE_HEADER else VIEW_TYPE_REGULAR
 
         override fun getView(i: Int, view: View?, viewGroup: ViewGroup): View {
+            val itemBinding: ListItemRoomBinding
             val convertView: View
-            val binding: ListItemRoomBinding
             if (view == null) {
-                binding = ListItemRoomBinding.inflate(layoutInflater, viewGroup, false)
-                convertView = binding.root
-                convertView.tag = binding
+                itemBinding = ListItemRoomBinding.inflate(layoutInflater, viewGroup, false)
+                convertView = itemBinding.root
+                convertView.tag = itemBinding
             } else {
                 convertView = view
-                binding = view.tag as ListItemRoomBinding
+                itemBinding = view.tag as ListItemRoomBinding
             }
-            val item = getItem(i)
-            binding.apply {
-                if (item is String) {
-                    title.text = item.relSize(1.35f)
-                    description.visibility = View.GONE
-                    chatImage.visibility = View.GONE
-                } else {
-                    val roomInfo = item as ChatRoomInfo
-                    title.text = roomInfo.name.bold()
-                    title.append(" (${roomInfo.userCount})".small().italic())
-                    description.text = roomInfo.description
-                    description.visibility = View.VISIBLE
-                    chatImage.visibility = View.VISIBLE
+            itemBinding.apply {
+                when (val item = getItem(i)) {
+                    is String -> {
+                        title.text = item.relSize(1.35f)
+                        description.visibility = View.GONE
+                        chatImage.visibility = View.GONE
+                    }
+                    is ChatRoomInfo -> {
+                        title.text = item.name.bold()
+                        title.append(" (${item.userCount})".small().italic())
+                        description.text = item.description
+                        description.visibility = View.VISIBLE
+                        chatImage.visibility = View.VISIBLE
+                    }
                 }
             }
             return convertView
         }
 
         override fun getItem(i: Int): Any {
-            val officialRoomsCount = officialRooms.size
-            if (i == 0) return "Official Rooms"
-            if (i < officialRoomsCount + 1) return officialRooms[i - 1]
-            return if (i == officialRoomsCount + 1) "Chat Rooms" else chatRooms[i - officialRoomsCount - 2]
+            val off = officialRooms.size
+            return when {
+                i == 0       -> "Official Rooms"
+                i < off + 1  -> officialRooms[i - 1]
+                i == off + 1 -> "Chat Rooms"
+                else         -> chatRooms[i - off - 2]
+            }
         }
 
         override fun getItemId(i: Int) = 0L
     }
 
     companion object {
-
         const val FRAGMENT_TAG = "join-chat-room-dialog"
 
         private const val ARG_OFFICIAL_ROOMS = "official-rooms"
-        private const val ARG_CHAT_ROOMS = "chat-rooms"
+        private const val ARG_CHAT_ROOMS     = "chat-rooms"
 
-        fun newInstance(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>): JoinChatRoomDialog {
-            val joinRoomDialog = JoinChatRoomDialog()
-            val bundle = Bundle()
-            bundle.putParcelableArrayList(ARG_OFFICIAL_ROOMS, officialRooms as? ArrayList ?: ArrayList(officialRooms))
-            bundle.putParcelableArrayList(ARG_CHAT_ROOMS, chatRooms as? ArrayList ?: ArrayList(chatRooms))
-            joinRoomDialog.arguments = bundle
-            return joinRoomDialog
-        }
+        fun newInstance(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>) =
+                JoinChatRoomDialog().apply {
+                    arguments = Bundle().apply {
+                        putParcelableArrayList(ARG_OFFICIAL_ROOMS, officialRooms as? ArrayList ?: ArrayList(officialRooms))
+                        putParcelableArrayList(ARG_CHAT_ROOMS,     chatRooms     as? ArrayList ?: ArrayList(chatRooms))
+                    }
+                }
     }
 }
