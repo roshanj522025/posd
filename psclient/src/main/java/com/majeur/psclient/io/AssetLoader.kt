@@ -221,7 +221,7 @@ class AssetLoader(val context: Context) {
         private val bitmapDecoder: BitmapRegionDecoder
             get() {
                 val inputStream = resources.openRawResource(R.raw.dex_icons_sheet)
-                return BitmapRegionDecoder.newInstance(inputStream, true)
+                return BitmapRegionDecoder.newInstance(inputStream, true)!!
             }
 
         @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
@@ -513,7 +513,7 @@ class AssetLoader(val context: Context) {
         private val bitmapDecoder: BitmapRegionDecoder
             get() {
                 val inputStream = resources.openRawResource(R.raw.item_icons_sheet)
-                return BitmapRegionDecoder.newInstance(inputStream, true)
+                return BitmapRegionDecoder.newInstance(inputStream, true)!!
             }
 
         @Throws(IOException::class)

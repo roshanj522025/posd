@@ -42,7 +42,7 @@ class ReplayManager(private val showdownService: ShowdownService) {
 
             @Throws(IOException::class)
             override fun onResponse(call: Call, response: Response) {
-                val rawResponse = response.body()?.string()
+                val rawResponse = response.body?.string()
                 if (rawResponse?.isEmpty() != false) {
                     Timber.e("Replay download request responded with an empty body.")
                     uiHandler.post(this@ReplayManager::notifyReplayDownloadFailure)

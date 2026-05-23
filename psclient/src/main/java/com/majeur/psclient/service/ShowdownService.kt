@@ -12,6 +12,8 @@ import com.majeur.psclient.service.observer.GlobalMessageObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -171,7 +173,7 @@ class ShowdownService : Service() {
 
     private val webSocketListener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            Timber.tag("WebSocket[OPEN]").i("Host: ${response.request().url().host()}")
+            Timber.tag("WebSocket[OPEN]").i("Host: ${response.request.url.host}")
             isConnected = true
             uiHandler.post {
                 dispatchMessage(ServerMessage("lobby", "|connected|"))
@@ -217,7 +219,7 @@ class ShowdownService : Service() {
             okHttpClient.newCall(request).enqueue(object : Callback {
                 @Throws(IOException::class)
                 override fun onResponse(call: Call, response: Response) {
-                    val rawResponse = response.body()?.string()
+                    val rawResponse = response.body?.string()
                     if (rawResponse?.isEmpty() != false) {
                         Timber.e("Assertion request responded with an empty body.")
                         return
@@ -250,7 +252,7 @@ class ShowdownService : Service() {
         okHttpClient.newCall(request).enqueue(object : Callback {
             @Throws(IOException::class)
             override fun onResponse(call: Call, response: Response) {
-                var rawResponse = response.body()?.string()
+                var rawResponse = response.body?.string()
                 if (rawResponse?.isNotBlank() != true) {
                     uiHandler.post { callback.onError("Something is interfering with our connection to the login server. Most likely, your internet provider needs you to re-log-in, or your internet provider is blocking Pokémon Showdown.") }
                     return
@@ -300,15 +302,15 @@ class ShowdownService : Service() {
                 .addQueryParameter("pass", password)
                 .addQueryParameter("challstr", getSharedData<String>("challenge"))
                 .build()
-        val mediaType = MediaType.parse("application/x-www-form-urlencoded;")
+        val mediaType = "application/x-www-form-urlencoded;".toMediaType()
         val request = Request.Builder()
                 .url(actionServerUrl.build())
-                .post(RequestBody.create(mediaType, dummyUrl.query()!!))
+                .post(dummyUrl.encodedQuery!!.toRequestBody(mediaType))
                 .build()
         okHttpClient.newCall(request).enqueue(object : Callback {
             @Throws(IOException::class)
             override fun onResponse(call: Call, response: Response) {
-                var rawResponse = response.body()?.string()
+                var rawResponse = response.body?.string()
                 if (rawResponse?.isNotEmpty() != true) {
                     uiHandler.post { callback.onError("Something is interfering with our connection to the login server. Most likely, your internet provider needs you to re-log-in, or your internet provider is blocking Pokémon Showdown.") }
                     return
@@ -422,7 +424,7 @@ class ShowdownService : Service() {
         } catch (e: IOException) {
             Timber.e(e)
             null
-        }?.body()?.string()
+        }?.body?.string()
     }
 
     fun putSharedData(key: String, data: Any?) {
