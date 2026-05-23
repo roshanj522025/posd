@@ -140,19 +140,21 @@ class GlobalMessageObserver(service: ShowdownService)
             DebugConsoleActivity.logEvent("queryresponse|rooms: showFullList=$showFullList userCount=$userCount battleCount=$battleCount")
             if (!showFullList) return
 
-            val officialRooms = jsonObject.getJSONArray("official").let { arr ->
-                (0 until arr.length()).map { i ->
-                    arr.getJSONObject(i).let { room ->
-                        ChatRoomInfo(room.getString("title"), room.getString("desc"), room.getInt("userCount"))
-                    }
-                }
-            }
-            val chatRooms = jsonObject.getJSONArray("chat").let { arr ->
-                (0 until arr.length()).map { i ->
-                    arr.getJSONObject(i).let { room ->
-                        ChatRoomInfo(room.getString("title"), room.getString("desc"), room.getInt("userCount"))
-                    }
-                }
+            // PS API changed: no longer sends a separate "official" array.
+            // All rooms are now in "chat" with a per-room "section" field.
+            val allRooms = jsonObject.getJSONArray("chat")
+            val officialRooms = mutableListOf<ChatRoomInfo>()
+            val chatRooms = mutableListOf<ChatRoomInfo>()
+            for (i in 0 until allRooms.length()) {
+                val room = allRooms.getJSONObject(i)
+                val info = ChatRoomInfo(
+                    room.getString("title"),
+                    room.optString("desc", ""),
+                    room.optInt("userCount", 0))
+                if (room.optString("section", "") == "Official")
+                    officialRooms.add(info)
+                else
+                    chatRooms.add(info)
             }
             DebugConsoleActivity.logEvent("rooms parsed: official=${officialRooms.size} chat=${chatRooms.size} → calling onAvailableRoomsChanged")
             onAvailableRoomsChanged(officialRooms, chatRooms)
