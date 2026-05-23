@@ -9,6 +9,8 @@ import com.majeur.psclient.util.Utils
 import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
+import com.majeur.psclient.ui.DebugConsoleActivity
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.*
 
 class GlobalMessageObserver(service: ShowdownService)
@@ -22,11 +24,9 @@ class GlobalMessageObserver(service: ShowdownService)
     var isUserGuest: Boolean = true
         private set
 
-    // Tracks what the pending |queryresponse|rooms| response should do.
-    // All reads and writes happen on the WebSocket message thread, so no
-    // synchronisation is needed beyond keeping the enum in a single field.
-    private enum class RoomsQueryPurpose { COUNTS_ONLY, FULL_ROOM_LIST }
-    private var pendingRoomsQueryPurpose = RoomsQueryPurpose.COUNTS_ONLY
+    // Whether the next queryresponse|rooms should show the full room picker.
+    // Written from UI thread (requestRoomList), read on WS thread — use AtomicBoolean.
+    private val pendingFullRoomList = AtomicBoolean(false)
 
     private val privateMessages = mutableMapOf<String, MutableList<String>>()
 
@@ -93,9 +93,10 @@ class GlobalMessageObserver(service: ShowdownService)
         isUserGuest = isGuest
         onUserChanged(username, isGuest, avatar)
 
-        // Fetch server counts only — room list is not needed here
-        pendingRoomsQueryPurpose = RoomsQueryPurpose.COUNTS_ONLY
+        // Fetch server counts only (don't reset pendingFullRoomList — user may have
+        // tapped Join just before login completed)
         service.sendGlobalCommand("cmd", "rooms")
+        DebugConsoleActivity.logEvent("updateuser: user=$username guest=$isGuest")
     }
 
     private fun processQueryResponse(msg: ServerMessage) {
@@ -120,7 +121,8 @@ class GlobalMessageObserver(service: ShowdownService)
      * the send is enqueued before the response can arrive, there is no race.
      */
     fun requestRoomList() {
-        pendingRoomsQueryPurpose = RoomsQueryPurpose.FULL_ROOM_LIST
+        pendingFullRoomList.set(true)
+        DebugConsoleActivity.logEvent("requestRoomList: sending cmd rooms")
         service.sendGlobalCommand("cmd", "rooms")
     }
 
@@ -134,12 +136,9 @@ class GlobalMessageObserver(service: ShowdownService)
             service.putSharedData("battles", battleCount)
             onUpdateCounts(userCount, battleCount)
 
-            // Consume the purpose flag before any early return so a subsequent
-            // counts-only query is not accidentally treated as a full list request
-            val purpose = pendingRoomsQueryPurpose
-            pendingRoomsQueryPurpose = RoomsQueryPurpose.COUNTS_ONLY
-
-            if (purpose == RoomsQueryPurpose.COUNTS_ONLY) return
+            val showFullList = pendingFullRoomList.getAndSet(false)
+            DebugConsoleActivity.logEvent("queryresponse|rooms: showFullList=$showFullList userCount=$userCount battleCount=$battleCount")
+            if (!showFullList) return
 
             val officialRooms = jsonObject.getJSONArray("official").let { arr ->
                 (0 until arr.length()).map { i ->
@@ -155,9 +154,11 @@ class GlobalMessageObserver(service: ShowdownService)
                     }
                 }
             }
+            DebugConsoleActivity.logEvent("rooms parsed: official=${officialRooms.size} chat=${chatRooms.size} → calling onAvailableRoomsChanged")
             onAvailableRoomsChanged(officialRooms, chatRooms)
         } catch (e: JSONException) {
             Timber.e(e, "Failed to parse rooms query response")
+            DebugConsoleActivity.logError("rooms parse FAILED: ${e.message}")
         }
     }
 
@@ -295,7 +296,10 @@ class GlobalMessageObserver(service: ShowdownService)
     fun onReplaySaved(replayId: String, url: String) = uiCallbacks?.onReplaySaved(replayId, url)
     fun onUserDetails(id: String, name: String, online: Boolean, group: String, rooms: List<String>, battles: List<String>) = uiCallbacks?.onUserDetails(id, name, online, group, rooms, battles)
     fun onShowPopup(message: String) = uiCallbacks?.onShowPopup(message)
-    fun onAvailableRoomsChanged(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>) = uiCallbacks?.onAvailableRoomsChanged(officialRooms, chatRooms)
+    fun onAvailableRoomsChanged(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>) {
+        DebugConsoleActivity.logEvent("onAvailableRoomsChanged: uiCallbacks=${uiCallbacks != null} official=${officialRooms.size} chat=${chatRooms.size}")
+        uiCallbacks?.onAvailableRoomsChanged(officialRooms, chatRooms)
+    }
     fun onAvailableBattleRoomsChanged(battleRooms: List<BattleRoomInfo>) = uiCallbacks?.onAvailableBattleRoomsChanged(battleRooms)
     fun onNewPrivateMessage(with: String, message: String) = uiCallbacks?.onNewPrivateMessage(with, message)
     fun onChallengesChange(to: String?, format: String?, from: Map<String, String>) = uiCallbacks?.onChallengesChange(to, format, from)

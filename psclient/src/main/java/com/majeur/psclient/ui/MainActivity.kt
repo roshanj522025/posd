@@ -21,6 +21,7 @@ import com.majeur.psclient.io.AssetLoader
 import com.majeur.psclient.io.GlideHelper
 import com.majeur.psclient.service.ShowdownService
 import timber.log.Timber
+import com.majeur.psclient.ui.DebugConsoleActivity
 
 
 class MainActivity : AppCompatActivity() {
@@ -155,6 +156,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun onNavigationItemSelected(menuItem: MenuItem): Boolean {
         val itemId = menuItem.itemId
+        if (itemId == R.id.debug_console) {
+            startActivity(DebugConsoleActivity.buildIntent(this))
+            return true
+        }
         clearBadge(itemId)
         showFragment(itemId)
         return true

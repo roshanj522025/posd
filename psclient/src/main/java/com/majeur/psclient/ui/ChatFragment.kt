@@ -22,6 +22,7 @@ import com.majeur.psclient.service.observer.ChatRoomMessageObserver
 import com.majeur.psclient.util.Callback
 import com.majeur.psclient.util.Utils
 import com.majeur.psclient.util.html.Html
+import com.majeur.psclient.ui.DebugConsoleActivity
 import com.majeur.psclient.util.toId
 
 
@@ -79,8 +80,7 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
                 observer?.roomJoined == true ->
                     service?.sendRoomCommand(observedRoomId, "leave")
                 else -> {
-                    // Request the full room list from the server; GlobalMessageObserver
-                    // marks the pending response so it is not discarded as counts-only
+                    DebugConsoleActivity.logEvent("Join button tapped — requesting room list")
                     service?.globalMessageObserver?.requestRoomList()
                 }
             }
@@ -161,8 +161,17 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     }
 
     fun onAvailableRoomsChanged(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>) {
-        if (!isAdded) return
-        if (parentFragmentManager.findFragmentByTag(JoinChatRoomDialog.FRAGMENT_TAG) != null) return
+        DebugConsoleActivity.logEvent("ChatFragment.onAvailableRoomsChanged: isAdded=$isAdded official=${officialRooms.size} chat=${chatRooms.size}")
+        if (!isAdded) {
+            DebugConsoleActivity.logError("ChatFragment not added — dialog NOT shown")
+            return
+        }
+        val existing = parentFragmentManager.findFragmentByTag(JoinChatRoomDialog.FRAGMENT_TAG)
+        if (existing != null) {
+            DebugConsoleActivity.logInfo("JoinChatRoomDialog already showing — skipping")
+            return
+        }
+        DebugConsoleActivity.logEvent("Showing JoinChatRoomDialog")
         JoinChatRoomDialog.newInstance(officialRooms, chatRooms)
                 .show(parentFragmentManager, JoinChatRoomDialog.FRAGMENT_TAG)
     }

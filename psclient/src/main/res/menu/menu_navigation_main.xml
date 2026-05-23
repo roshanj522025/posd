@@ -25,4 +25,10 @@
         android:icon="@drawable/ic_pokeball"
         android:title="Teams" />
 
+    <item
+        android:id="@+id/debug_console"
+        android:enabled="true"
+        android:icon="@drawable/ic_type_bug"
+        android:title="Debug"/>
+
 </menu>

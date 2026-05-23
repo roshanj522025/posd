@@ -18,6 +18,7 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
+import com.majeur.psclient.ui.DebugConsoleActivity
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -174,9 +175,11 @@ class ShowdownService : Service() {
     private fun sendMessage(message: String) {
         if (isConnected) {
             Timber.tag("WebSocket[SEND]").i(message)
+            DebugConsoleActivity.logSend(message)
             webSocket?.send(message)
         } else {
             Timber.w("WebSocket not opened. Queuing message: $message")
+            DebugConsoleActivity.logInfo("QUEUED: $message")
             sendQueue.add(message)
         }
     }
@@ -215,6 +218,7 @@ class ShowdownService : Service() {
             Timber.tag("WebSocket[OPEN]").i("Host: ${response.request.url.host}")
             isConnected = true
             reconnectDelay = RECONNECT_DELAY_INITIAL // reset backoff on successful connect
+            DebugConsoleActivity.logEvent("WebSocket CONNECTED to ${response.request.url.host}")
             uiHandler.post {
                 // Flush any messages that were queued while disconnected
                 val queued = sendQueue.toList()
@@ -231,6 +235,7 @@ class ShowdownService : Service() {
 
         override fun onMessage(webSocket: WebSocket, data: String) {
             Timber.tag("WebSocket[RECEIVE]").i(data)
+            DebugConsoleActivity.logReceive(data.take(300))
             uiHandler.post {
                 processServerData(data)
             }
@@ -244,6 +249,7 @@ class ShowdownService : Service() {
             Timber.tag("WebSocket[ERR]").w(t)
             isConnected = false
             this@ShowdownService.webSocket = null
+            DebugConsoleActivity.logError("WebSocket FAILED: ${t.message}")
             uiHandler.post {
                 dispatchMessage(ServerMessage("lobby", "|networkerror|"))
                 scheduleReconnect()
@@ -254,6 +260,7 @@ class ShowdownService : Service() {
             Timber.tag("WebSocket[CLOSED]").i(reason)
             isConnected = false
             this@ShowdownService.webSocket = null
+            DebugConsoleActivity.logEvent("WebSocket CLOSED: code=$code reason=$reason")
             if (code != WS_CLOSE_NORMAL && code != WS_CLOSE_GOING_AWAY) {
                 uiHandler.post { scheduleReconnect() }
             }

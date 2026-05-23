@@ -44,6 +44,11 @@
             android:exported="false"/>
 
         <activity
+            android:name=".ui.DebugConsoleActivity"
+            android:exported="false"
+            android:label="Debug Console"/>
+
+        <activity
             android:name=".PSClient$CrashActivity"
             android:exported="false"
             android:process=":crash"

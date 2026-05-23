@@ -45,6 +45,7 @@ import com.majeur.psclient.widget.PrivateMessagesOverviewWidget.OnItemClickListe
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import com.majeur.psclient.ui.DebugConsoleActivity
 
 class HomeFragment : BaseFragment(), GlobalMessageObserver.UiCallbacks, View.OnClickListener {
 
@@ -746,6 +747,7 @@ class HomeFragment : BaseFragment(), GlobalMessageObserver.UiCallbacks, View.OnC
     }
 
     override fun onAvailableRoomsChanged(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>) {
+        DebugConsoleActivity.logEvent("HomeFragment.onAvailableRoomsChanged: official=${officialRooms.size} chat=${chatRooms.size}")
         chatFragment.onAvailableRoomsChanged(officialRooms, chatRooms)
     }
 
