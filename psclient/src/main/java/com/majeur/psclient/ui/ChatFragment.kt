@@ -11,7 +11,6 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.TextView
-import android.widget.Toast
 import com.majeur.psclient.R
 import com.majeur.psclient.databinding.FragmentChatBinding
 import com.majeur.psclient.io.AssetLoader
@@ -28,7 +27,6 @@ import com.majeur.psclient.util.toId
 
 class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
 
-    // Null-safe: service may not be bound yet when the setter is called
     private val observer get() = service?.chatMessageObserver
 
     private lateinit var inputMethodManager: InputMethodManager
@@ -38,9 +36,6 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     private var _binding: FragmentChatBinding? = null
     private val binding get() = _binding!!
 
-    // Backing field kept separately so we can restore it into the observer
-    // after a service reconnect, without triggering the setter side-effects
-    // while service is still null
     private var _observedRoomId: String? = null
     var observedRoomId: String?
         get() = _observedRoomId
@@ -76,7 +71,7 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         binding.joinButton.setOnClickListener {
             when {
                 service == null || service?.isConnected != true ->
-                    Toast.makeText(requireContext(), "Not connected to Showdown", Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(requireContext(), "Not connected to Showdown", android.widget.Toast.LENGTH_SHORT).show()
                 observer?.roomJoined == true ->
                     service?.sendRoomCommand(observedRoomId, "leave")
                 else -> {
@@ -116,7 +111,7 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
                 sendButton.isEnabled = true
                 sendButton.drawable.alpha = 255
                 joinButton.setImageResource(R.drawable.ic_exit)
-                chatLog.gravity = Gravity.START or Gravity.TOP
+                chatLog.gravity = Gravity.START
                 chatLog.setText("", TextView.BufferType.EDITABLE)
             }
         } else {
@@ -130,14 +125,13 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
                 sendButton.drawable.alpha = 128
                 joinButton.setImageResource(R.drawable.ic_enter)
                 joinButton.requestFocus()
-                // Cancel any in-progress animation before modifying text
-                chatLog.animate().cancel()
-                chatLog.alpha = 1f
-                // Must use EDITABLE buffer type — plain assignment switches buffer
-                // type away from Editable and breaks append() on next room join
-                chatLog.setText("\n\n\n\n\n\n\n\n\n\nTap the join button to join a room",
-                    TextView.BufferType.EDITABLE)
-                chatLog.gravity = Gravity.CENTER_HORIZONTAL or Gravity.CENTER_VERTICAL
+                chatLog.animate().alpha(0f).withEndAction {
+                    _binding ?: return@withEndAction  // guard: view may be destroyed
+                    chatLog.setText("\n\n\n\n\n\n\n\n\n\nTap the join button to join a room",
+                        TextView.BufferType.EDITABLE)
+                    chatLog.gravity = Gravity.CENTER_HORIZONTAL
+                    chatLog.animate().alpha(1f).withEndAction(null).start()
+                }.start()
             }
             inputMethodManager.hideSoftInputFromWindow(binding.messageInput.windowToken, 0)
         }
@@ -153,8 +147,6 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     override fun onServiceBound(service: ShowdownService) {
         super.onServiceBound(service)
         service.chatMessageObserver.uiCallbacks = this
-        // Restore the observed room into the freshly bound observer so that
-        // messages keep routing correctly after a reconnect or config change
         service.chatMessageObserver.observedRoomId = _observedRoomId
     }
 
@@ -165,15 +157,9 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
 
     fun onAvailableRoomsChanged(officialRooms: List<ChatRoomInfo>, chatRooms: List<ChatRoomInfo>) {
         DebugConsoleActivity.logEvent("ChatFragment.onAvailableRoomsChanged: isAdded=$isAdded official=${officialRooms.size} chat=${chatRooms.size}")
-        if (!isAdded) {
-            DebugConsoleActivity.logError("ChatFragment not added — dialog NOT shown")
-            return
-        }
+        if (!isAdded) return
         val existing = parentFragmentManager.findFragmentByTag(JoinChatRoomDialog.FRAGMENT_TAG)
-        if (existing != null) {
-            DebugConsoleActivity.logInfo("JoinChatRoomDialog already showing — skipping")
-            return
-        }
+        if (existing != null) return
         DebugConsoleActivity.logEvent("Showing JoinChatRoomDialog")
         JoinChatRoomDialog.newInstance(officialRooms, chatRooms)
                 .show(parentFragmentManager, JoinChatRoomDialog.FRAGMENT_TAG)
@@ -187,79 +173,49 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         binding.chatLogContainer.post { binding.chatLogContainer.fullScroll(View.FOCUS_DOWN) }
     }
 
-    // ── ChatRoomMessageObserver.UiCallbacks ──────────────────────────────
-
     override fun onRoomInit() {
-        try {
-            setUiState(roomJoined = true)
-        } catch (e: Exception) {
-            DebugConsoleActivity.logError("onRoomInit CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
-        }
+        setUiState(roomJoined = true)
     }
 
     override fun onRoomDeInit() {
-        try {
-            _observedRoomId = null
-            observer?.observedRoomId = null
-            setUiState(roomJoined = false)
-        } catch (e: Exception) {
-            DebugConsoleActivity.logError("onRoomDeInit CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
-        }
+        _observedRoomId = null
+        observer?.observedRoomId = null
+        setUiState(roomJoined = false)
     }
 
     override fun onPrintText(text: CharSequence) {
-        try {
-            val b = _binding ?: return
-            val fullScrolled = Utils.fullScrolled(b.chatLogContainer)
-            if (b.chatLog.length() > 0) b.chatLog.append("\n")
-            b.chatLog.append(text)
-            notifyNewMessageReceived()
-            if (fullScrolled) postFullScroll()
-        } catch (e: Exception) {
-            DebugConsoleActivity.logError("onPrintText CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
-        }
+        val fullScrolled = Utils.fullScrolled(binding.chatLogContainer)
+        if (binding.chatLog.length() > 0) binding.chatLog.append("\n")
+        binding.chatLog.append(text)
+        notifyNewMessageReceived()
+        if (fullScrolled) postFullScroll()
     }
 
     override fun onPrintHtml(html: String) {
-        try {
-            val b = _binding ?: return
-            val mark = Any()
-            val l = b.chatLog.length()
-            b.chatLog.append("\u200C")
-            b.chatLog.editableText.setSpan(mark, l, l + 1, Spanned.SPAN_MARK_MARK)
-            val imgWidth = if (b.chatLog.width > 0) b.chatLog.width
-                           else resources.displayMetrics.widthPixels
-            Html.fromHtml(
-                    html,
-                    Html.FROM_HTML_MODE_COMPACT,
-                    glideHelper.getHtmlImageGetter(assetLoader, imgWidth),
-                    Callback { spanned: Spanned? ->
-                        try {
-                            val b2 = _binding ?: return@Callback
-                            val at = b2.chatLog.editableText.getSpanStart(mark)
-                            if (at == -1) return@Callback
-                            val fullScrolled = Utils.fullScrolled(b2.chatLogContainer)
-                            b2.chatLog.editableText
-                                    .insert(at, "\n")
-                                    .insert(at + 1, spanned)
-                            notifyNewMessageReceived()
-                            if (fullScrolled) postFullScroll()
-                        } catch (e: Exception) {
-                            DebugConsoleActivity.logError("onPrintHtml callback CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
-                        }
-                    })
-        } catch (e: Exception) {
-            DebugConsoleActivity.logError("onPrintHtml CRASH: ${e::class.simpleName}: ${e.message}\n${e.stackTraceToString().take(400)}")
-        }
+        val mark = Any()
+        val l = binding.chatLog.length()
+        binding.chatLog.append("\u200C")
+        binding.chatLog.editableText.setSpan(mark, l, l + 1, Spanned.SPAN_MARK_MARK)
+        Html.fromHtml(html,
+                Html.FROM_HTML_MODE_COMPACT,
+                glideHelper.getHtmlImageGetter(assetLoader, binding.chatLog.width),
+                Callback { spanned: Spanned? ->
+                    val at = binding.chatLog.editableText.getSpanStart(mark)
+                    if (at == -1) return@Callback
+                    val fullScrolled = Utils.fullScrolled(binding.chatLogContainer)
+                    binding.chatLog.editableText
+                            .insert(at, "\n")
+                            .insert(at + 1, spanned)
+                    notifyNewMessageReceived()
+                    if (fullScrolled) postFullScroll()
+                })
     }
 
     override fun onRoomTitleChanged(title: String) {
-        try { _binding?.roomTitle?.text = title }
-        catch (e: Exception) { DebugConsoleActivity.logError("onRoomTitleChanged CRASH: ${e.message}") }
+        binding.roomTitle.text = title
     }
 
     override fun onUpdateUsers(users: List<String>) {
-        try { _binding?.usersCount?.text = "${users.size} users" }
-        catch (e: Exception) { DebugConsoleActivity.logError("onUpdateUsers CRASH: ${e.message}") }
+        binding.usersCount.text = "${users.size} users"
     }
 }

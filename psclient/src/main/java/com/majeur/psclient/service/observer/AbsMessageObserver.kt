@@ -9,17 +9,11 @@ abstract class AbsMessageObserver<C : AbsMessageObserver.UiCallbacks>(
         val service: ShowdownService
 ) {
 
-    // All UI callbacks MUST run on the main thread.
-    // WebSocket messages arrive on OkHttp's background thread — if we call
-    // UI methods directly from that thread we get CalledFromWrongThreadException
-    // or silent corruption of the Editable span list, causing the ANR freeze.
     private val uiHandler = Handler(Looper.getMainLooper())
 
     var uiCallbacks: C? = null
         set(value) {
             field = value
-            // onUiCallbacksAttached is always called from the main thread
-            // (set in onServiceBound). Call synchronously — no post needed.
             if (value != null) onUiCallbacksAttached()
         }
 
@@ -33,7 +27,6 @@ abstract class AbsMessageObserver<C : AbsMessageObserver.UiCallbacks>(
 
     fun postMessage(message: ServerMessage, forcePost: Boolean = false) {
         if (forcePost || observedRoomId == message.roomId) {
-            // Dispatch to main thread so all observer callbacks are UI-safe
             uiHandler.post { onMessage(message) }
         }
     }
