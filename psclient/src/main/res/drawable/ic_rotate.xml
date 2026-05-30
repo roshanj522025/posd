@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Screen rotation icon -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M9,2L7.17,3.83 9.17,5.83C8.07,6.75 7.24,7.99 6.8,9.42L4,9.42 4,14.42C4,17.18 5.65,19.55 8.04,20.68L6,22.71 7.29,24 22,9.29 20.71,8 18.92,9.79C17.84,8.07 16.07,6.85 14,6.41L14,2 9,2zM11,4L12,4 12,6.06C11.32,6.15 10.67,6.34 10.07,6.62L11,4zM19,12.04C19,15.35 16.35,18 13.04,18 11.95,18 10.96,17.67 10.12,17.11L17.11,10.12C18.03,10.98 19,11.99 19,12.04zM5,12.5L5,11.5 5,9.5 7.22,9.5C7.08,10 7,10.5 7,11 7,11.34 7.04,11.67 7.09,12 6.06,12.19 5.5,12.5 5,12.5z"/>
+</vector>

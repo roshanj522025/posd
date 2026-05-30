@@ -1,6 +1,7 @@
 package com.majeur.psclient.ui
 
 import android.content.ComponentName
+import android.content.res.Configuration
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
@@ -136,6 +137,24 @@ class MainActivity : AppCompatActivity() {
             }
             if (now) commitNowAllowingStateLoss() else commitAllowingStateLoss()
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Re-inflate the layout so the correct portrait/landscape variant is used,
+        // then re-attach all fragments without recreating the activity (and losing state).
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        val useLandscape = resources.getBoolean(R.bool.landscape)
+        if (useLandscape) {
+            binding.navigationView?.setNavigationItemSelectedListener(this::onNavigationItemSelected)
+        } else {
+            binding.bottomNavigation?.setOnNavigationItemSelectedListener(this::onNavigationItemSelected)
+        }
+        // Show battle fragment in landscape (it fills the right pane), home in portrait
+        val targetId = if (useLandscape) R.id.fragment_battle else R.id.fragment_home
+        showFragment(targetId, now = true, checkAlreadyShown = false)
+        setSelectedNavigationItem(targetId)
     }
 
     override fun onBackPressed() {

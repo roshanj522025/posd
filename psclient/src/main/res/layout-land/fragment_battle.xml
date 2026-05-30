@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Landscape battle layout: battle field (left) + log/moves (right) -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal">
+
+    <!-- LEFT: battle field column -->
+    <RelativeLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1">
+
+        <ImageView
+            android:id="@+id/background_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:elevation="4dp"
+            android:layout_alignBottom="@id/trainer_info"
+            android:src="@drawable/battle_bg_1"
+            android:scaleType="centerCrop"/>
+
+        <ImageView
+            android:id="@+id/overlay_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:elevation="4dp"
+            android:layout_alignBottom="@id/trainer_info"
+            android:scaleType="centerCrop"/>
+
+        <com.majeur.psclient.widget.PlayerInfoView
+            android:id="@+id/foe_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:elevation="4dp"
+            android:paddingBottom="1dp"
+            android:paddingEnd="12dp"
+            android:background="@color/battle_overlay"
+            android:gravity="end"/>
+
+        <com.majeur.psclient.widget.BattleLayout
+            android:id="@+id/battle_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/foe_info"
+            android:elevation="4dp"/>
+
+        <com.majeur.psclient.widget.PlayerInfoView
+            android:id="@+id/trainer_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/battle_layout"
+            android:elevation="4dp"
+            android:paddingBottom="1dp"
+            android:paddingStart="12dp"
+            android:background="@color/battle_overlay"/>
+
+        <TextView
+            android:id="@+id/battle_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/trainer_info"
+            android:layout_margin="4dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:elevation="4dp"
+            android:background="@drawable/bg_battle_message"
+            android:textColor="@android:color/white"
+            android:alpha="0"/>
+
+        <!-- Decision widget anchored to bottom of field in landscape -->
+        <com.majeur.psclient.widget.BattleDecisionWidget
+            android:id="@+id/battle_decision_widget"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/trainer_info"
+            android:layout_alignParentBottom="true"
+            android:elevation="4dp"
+            android:background="?attr/colorSurface"/>
+
+    </RelativeLayout>
+
+    <!-- RIGHT: log + action buttons column -->
+    <RelativeLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1">
+
+        <com.majeur.psclient.widget.ExtraActionLayout
+            android:id="@+id/extra_action_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentTop="true">
+
+            <include android:id="@+id/replay_actions" layout="@layout/layout_replay_actions"/>
+            <include android:id="@+id/extra_actions"  layout="@layout/layout_extra_actions"/>
+
+            <TextView
+                android:id="@+id/undo_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="Undo"
+                android:drawableStart="@drawable/ic_undo"
+                style="@style/Widget.PSClient.ExtraActionButton"/>
+
+            <TextView
+                android:id="@+id/rematch_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="Rematch"
+                android:drawableStart="@drawable/ic_rematch"
+                style="@style/Widget.PSClient.ExtraActionButton"/>
+
+            <TextView
+                android:id="@+id/upload_replay_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="Upload replay"
+                android:drawableStart="@drawable/ic_upload"
+                style="@style/Widget.PSClient.ExtraActionButton"/>
+
+        </com.majeur.psclient.widget.ExtraActionLayout>
+
+        <ScrollView
+            android:id="@+id/battle_log_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_toStartOf="@id/extra_action_layout"
+            android:background="?attr/colorBackground"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
+            <TextView
+                android:id="@+id/battle_log"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="?attr/colorOnBackground"
+                android:textSize="14sp"
+                android:paddingStart="12dp"/>
+
+        </ScrollView>
+
+    </RelativeLayout>
+
+</LinearLayout>

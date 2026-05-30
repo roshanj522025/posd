@@ -1,5 +1,7 @@
 package com.majeur.psclient.ui
 
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.BitmapDrawable
@@ -114,6 +116,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                     extraActionLayout.setTopOffset(0, BattleDecisionWidget.REVEAL_ANIMATION_DURATION)
                 }
             }
+            extraActions.rotateButton.setOnClickListener(this@BattleFragment)
             extraActions.timerButton.setOnClickListener(this@BattleFragment)
             extraActions.forfeitButton.setOnClickListener(this@BattleFragment)
             extraActions.sendButton.setOnClickListener(this@BattleFragment)
@@ -155,6 +158,15 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     override fun onServiceWillUnbound(service: ShowdownService) {
         super.onServiceWillUnbound(service)
         service.battleMessageObserver.uiCallbacks = null
+    }
+
+    private fun toggleBattleLandscape() {
+        val activity = requireActivity()
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        activity.requestedOrientation = if (isLandscape)
+            ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+        else
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
 
     fun forfeit() = service?.sendRoomCommand(observedRoomId, "forfeit")
@@ -247,6 +259,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                     false
                 }
             }
+            binding.extraActions.rotateButton -> toggleBattleLandscape()
             binding.extraActions.timerButton -> {
                 if (battleRunning) sendTimerCommand(!timerEnabled)
             }
