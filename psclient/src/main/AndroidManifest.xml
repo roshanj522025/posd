@@ -18,7 +18,6 @@
             android:name=".ui.MainActivity"
             android:windowSoftInputMode="adjustPan|stateUnchanged"
             android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
