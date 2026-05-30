@@ -233,7 +233,6 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
     override fun onUpdateUsers(users: List<String>) {
         binding.usersCount.text = "${users.size} users"
     }
-}
 
     companion object {
         private const val STATE_ROOM_ID = "state:observedRoomId"

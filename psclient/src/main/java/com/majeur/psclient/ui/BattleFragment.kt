@@ -869,7 +869,6 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         }
         audioManager.stopBattleMusic()
     }
-}
 
     companion object {
         private const val STATE_ROOM_ID = "state:observedRoomId"
