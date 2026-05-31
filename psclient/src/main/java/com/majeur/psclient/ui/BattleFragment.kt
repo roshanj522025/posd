@@ -43,7 +43,6 @@ import com.majeur.psclient.widget.BattleDecisionWidget
 import com.majeur.psclient.widget.BattleLayout
 import com.majeur.psclient.widget.BattleTipPopup
 import kotlinx.coroutines.launch
-import timber.log.Timber
 
 class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, View.OnClickListener {
 
@@ -254,6 +253,33 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         }
         if (animate) battleLayout.animate().alpha(0f).withEndAction(clearUiAction).start()
         else clearUiAction.run()
+    }
+
+    /**
+     * Load a battle sprite into its [ImageView], waiting for the [BattleLayout] to complete
+     * its layout pass if needed. This handles the race where |switch| messages arrive in the
+     * same WebSocket frame as |start|, before [BattleLayout.setMode] has had a chance to run
+     * [BattleLayout.onLayout] and populate the sprite [ImageView] slots.
+     */
+    private fun loadSpriteWhenReady(pokemon: BattlingPokemon) {
+        val battleLayout = binding.battleLayout
+        fun doLoad() {
+            val view = battleLayout.getSpriteView(pokemon.id) ?: return
+            view.setTag(R.id.battle_data_tag, pokemon)
+            battleTipPopup.addTippedView(view)
+            glideHelper.loadBattleSprite(pokemon, view)
+        }
+        if (battleLayout.getSpriteView(pokemon.id) != null) {
+            doLoad()
+        } else {
+            battleLayout.viewTreeObserver.addOnGlobalLayoutListener(object :
+                android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    battleLayout.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    doLoad()
+                }
+            })
+        }
     }
 
     override fun onClick(clickedView: View?) {
@@ -583,9 +609,19 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
                 infoView.appendPokemon(pokemon, BitmapDrawable(resources, it))
             }
             if (!isReplay) {
-                binding.battleLayout.getSpriteView(id)?.apply {
-                    glideHelper.loadPreviewSprite(id.player, pokemon, this)
+                val battleLayout = binding.battleLayout
+                fun loadPreview() {
+                    val view = battleLayout.getSpriteView(id) ?: return
+                    glideHelper.loadPreviewSprite(id.player, pokemon, view)
                 }
+                if (battleLayout.getSpriteView(id) != null) loadPreview()
+                else battleLayout.viewTreeObserver.addOnGlobalLayoutListener(object :
+                    android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        battleLayout.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                        loadPreview()
+                    }
+                })
             }
         }
     }
@@ -646,26 +682,7 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
             // (e.g. all switch messages arrive in the same WS frame as |start|).
             // Post to the view tree observer so we wait for layout before accessing
             // sprite views.
-            val battleLayout = binding.battleLayout
-            fun loadSprite() {
-                val spriteView = battleLayout.getSpriteView(pokemon.id) ?: return
-                spriteView.setTag(R.id.battle_data_tag, pokemon)
-                battleTipPopup.addTippedView(spriteView)
-                glideHelper.loadBattleSprite(pokemon, spriteView)
-            }
-
-            if (battleLayout.width > 0 && battleLayout.getSpriteView(pokemon.id) != null) {
-                loadSprite()
-            } else {
-                // Layout hasn't run yet — wait for the next layout pass
-                battleLayout.viewTreeObserver.addOnGlobalLayoutListener(object :
-                    android.view.ViewTreeObserver.OnGlobalLayoutListener {
-                    override fun onGlobalLayout() {
-                        battleLayout.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                        loadSprite()
-                    }
-                })
-            }
+            loadSpriteWhenReady(pokemon)
 
             dexPokemon?.let {
                 val icon = assetLoader.dexIcon(speciesId)
