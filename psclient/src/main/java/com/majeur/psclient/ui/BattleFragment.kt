@@ -640,18 +640,33 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
             val speciesId = pokemon.species.toId()
             val dexPokemon = assetLoader.dexPokemon(speciesId)
             pokemon.dexNum = dexPokemon?.num ?: 0
-            Timber.d("onSwitch species=%s speciesId=%s num=%d spriteView=%s",
-                pokemon.species, speciesId, pokemon.dexNum,
-                binding.battleLayout.getSpriteView(pokemon.id))
-            val spriteView = binding.battleLayout.getSpriteView(pokemon.id)
-            if (spriteView != null) {
+
+            // setMode() calls requestLayout() which is async — the sprite ImageViews
+            // may not exist yet if onSwitch fires before the first layout pass completes
+            // (e.g. all switch messages arrive in the same WS frame as |start|).
+            // Post to the view tree observer so we wait for layout before accessing
+            // sprite views.
+            val battleLayout = binding.battleLayout
+            fun loadSprite() {
+                val spriteView = battleLayout.getSpriteView(pokemon.id) ?: return
                 spriteView.setTag(R.id.battle_data_tag, pokemon)
                 battleTipPopup.addTippedView(spriteView)
                 glideHelper.loadBattleSprite(pokemon, spriteView)
-            } else {
-                Timber.w("onSwitch: getSpriteView returned null for %s pos=%d foe=%b",
-                    pokemon.species, pokemon.position, pokemon.foe)
             }
+
+            if (battleLayout.width > 0 && battleLayout.getSpriteView(pokemon.id) != null) {
+                loadSprite()
+            } else {
+                // Layout hasn't run yet — wait for the next layout pass
+                battleLayout.viewTreeObserver.addOnGlobalLayoutListener(object :
+                    android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        battleLayout.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                        loadSprite()
+                    }
+                })
+            }
+
             dexPokemon?.let {
                 val icon = assetLoader.dexIcon(speciesId)
                 icon?.let {
