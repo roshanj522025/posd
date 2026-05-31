@@ -13,6 +13,23 @@ import com.majeur.psclient.model.common.Item
 import com.majeur.psclient.model.common.Stats
 import com.majeur.psclient.model.pokemon.DexPokemon
 import com.majeur.psclient.util.toId
+
+// Safe JsonReader extension: handles NUMBER, BOOLEAN, and STRING "true"/"false"
+private fun JsonReader.nextIntOrBool(trueVal: Int = 1, falseVal: Int = 0): Int {
+    return when (peek()) {
+        JsonToken.BOOLEAN -> if (nextBoolean()) trueVal else falseVal
+        JsonToken.NULL    -> { nextNull(); falseVal }
+        else -> {
+            // Could be NUMBER or STRING — try parsing as number, fall back to bool string
+            val raw = nextString()
+            when (raw.lowercase()) {
+                "true"  -> trueVal
+                "false" -> falseVal
+                else    -> raw.toDoubleOrNull()?.toInt() ?: falseVal
+            }
+        }
+    }
+}
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -479,19 +496,19 @@ class AssetLoader(val context: Context) {
                 reader.beginObject()
                 while (reader.hasNext()) {
                     when (reader.nextName()) {
-                        "accuracy" -> accuracy = if (reader.peek() == JsonToken.BOOLEAN) if (reader.nextBoolean()) -1 else 0 else reader.nextInt()
-                        "basePower" -> basePower = reader.nextInt()
-                        "category" -> category = reader.nextString()
-                        "desc" -> desc = reader.nextString()
+                        "accuracy"  -> accuracy  = reader.nextIntOrBool(trueVal = -1, falseVal = 0)
+                        "basePower" -> basePower = reader.nextIntOrBool()
+                        "category"  -> category  = reader.nextString()
+                        "desc"      -> desc       = reader.nextString()
                         "shortDesc" -> reader.nextString().let { desc = desc ?: it }
-                        "type" -> type = reader.nextString()
-                        "priority" -> priority = reader.nextInt()
-                        "name" -> this.name = reader.nextString()
-                        "pp" -> pp = reader.nextInt()
-                        "zMovePower" -> zPower = reader.nextInt()
-                        "target" -> target = Move.Target.parse(reader.nextString())
-                        "zMoveEffect" -> zEffect = reader.nextString()
-                        "gmaxPower" -> maxPower = reader.nextInt()
+                        "type"      -> type       = reader.nextString()
+                        "priority"  -> priority   = reader.nextIntOrBool()
+                        "name"      -> this.name  = reader.nextString()
+                        "pp"        -> pp         = reader.nextIntOrBool()
+                        "zMovePower"  -> zPower   = reader.nextIntOrBool()
+                        "target"      -> target   = Move.Target.parse(reader.nextString())
+                        "zMoveEffect" -> zEffect  = reader.nextString()
+                        "gmaxPower"   -> maxPower = reader.nextIntOrBool()
                         else -> reader.skipValue()
                     }
                 }
