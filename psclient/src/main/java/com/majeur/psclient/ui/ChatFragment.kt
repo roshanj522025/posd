@@ -51,19 +51,9 @@ class ChatFragment : BaseFragment(), ChatRoomMessageObserver.UiCallbacks {
         assetLoader = mainActivity.assetLoader
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        savedInstanceState?.getString(STATE_ROOM_ID)?.let { _observedRoomId = it }
-    }
-
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         _binding = FragmentChatBinding.inflate(inflater, container, false)
         return binding.root
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        _observedRoomId?.let { outState.putString(STATE_ROOM_ID, it) }
     }
 
     override fun onDestroyView() {

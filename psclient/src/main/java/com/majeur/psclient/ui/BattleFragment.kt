@@ -1,7 +1,5 @@
 package com.majeur.psclient.ui
 
-import android.content.pm.ActivityInfo
-import android.content.res.Configuration
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.BitmapDrawable
@@ -89,19 +87,9 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         audioManager = BattleAudioManager(context)
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        savedInstanceState?.getString(STATE_ROOM_ID)?.let { _observedRoomId = it }
-    }
-
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         _binding = FragmentBattleBinding.inflate(inflater, container, false)
         return binding.root
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        _observedRoomId?.let { outState.putString(STATE_ROOM_ID, it) }
     }
 
     override fun onDestroyView() {
@@ -171,12 +159,49 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     }
 
     private fun toggleBattleLandscape() {
-        val activity = requireActivity()
-        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        activity.requestedOrientation = if (isLandscape)
-            ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
-        else
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        val isLandscape = binding.root.rotation == 90f
+        if (isLandscape) {
+            exitLandscape()
+        } else {
+            enterLandscape()
+        }
+    }
+
+    private fun enterLandscape() {
+        val display = requireActivity().windowManager.defaultDisplay
+        val rotation = binding.root.rotation
+
+        // Rotate the entire fragment view 90 degrees and swap its dimensions
+        // so it fills the screen in landscape without rotating the activity.
+        // This keeps all other fragments in portrait.
+        binding.root.apply {
+            val w = width.toFloat()
+            val h = height.toFloat()
+            pivotX = w / 2f
+            pivotY = h / 2f
+            this.rotation = 90f
+            scaleX = h / w
+            scaleY = w / h
+        }
+        // Update rotate button icon to show it can go back
+        binding.extraActions.rotateButton.setImageResource(R.drawable.ic_rotate)
+        // Hide system UI for full immersion
+        requireActivity().window.decorView.systemUiVisibility = (
+            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+            android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+            android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        )
+    }
+
+    private fun exitLandscape() {
+        binding.root.apply {
+            rotation = 0f
+            scaleX = 1f
+            scaleY = 1f
+        }
+        // Restore system UI
+        requireActivity().window.decorView.systemUiVisibility =
+            android.view.View.SYSTEM_UI_FLAG_VISIBLE
     }
 
     fun forfeit() = service?.sendRoomCommand(observedRoomId, "forfeit")
@@ -847,6 +872,8 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
     }
 
     override fun onRoomDeInit() {
+        // Always exit landscape when battle ends
+        if (binding.root.rotation == 90f) exitLandscape()
         mainActivity.setKeepScreenOn(false)
         lastDecisionRequest = null
         inactiveBattleOverlayDrawable.setWinner(null)
