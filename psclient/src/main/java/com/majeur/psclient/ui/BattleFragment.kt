@@ -575,14 +575,17 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
 
     override fun onAddPreviewPokemon(id: PokemonId, pokemon: BasePokemon, hasItem: Boolean) {
         fragmentScope.launch {
+            val dexPokemon = assetLoader.dexPokemon(pokemon.species.toId())
+            if (pokemon is BattlingPokemon) pokemon.dexNum = dexPokemon?.num ?: 0
             assetLoader.dexIcon(pokemon.species.toId())?.let {
                 val infoView = if (!id.foe) binding.trainerInfo else binding.foeInfo
                 infoView.appendPokemon(pokemon, BitmapDrawable(resources, it))
             }
-        }
-        if (isReplay) return
-        binding.battleLayout.getSpriteView(id)?.apply {
-            glideHelper.loadPreviewSprite(id.player, pokemon, this)
+            if (!isReplay) {
+                binding.battleLayout.getSpriteView(id)?.apply {
+                    glideHelper.loadPreviewSprite(id.player, pokemon, this)
+                }
+            }
         }
     }
 
@@ -631,15 +634,21 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
             setPokemon(pokemon)
             animate().alpha(1f).start()
         }
-        binding.battleLayout.getSpriteView(pokemon.id)?.apply {
-            setTag(R.id.battle_data_tag, pokemon)
-            battleTipPopup.addTippedView(this)
-            glideHelper.loadBattleSprite(pokemon, this)
-        }
+        // Look up dex number first so GlideHelper can build the PokeAPI URL
         fragmentScope.launch {
-            assetLoader.dexIcon(pokemon.species.toId())?.let {
-                val infoView = if (!pokemon.foe) binding.trainerInfo else binding.foeInfo
-                infoView.updatePokemon(pokemon, BitmapDrawable(resources, it))
+            val dexPokemon = assetLoader.dexPokemon(pokemon.species.toId())
+            pokemon.dexNum = dexPokemon?.num ?: 0
+            binding.battleLayout.getSpriteView(pokemon.id)?.apply {
+                setTag(R.id.battle_data_tag, pokemon)
+                battleTipPopup.addTippedView(this)
+                glideHelper.loadBattleSprite(pokemon, this)
+            }
+            dexPokemon?.let {
+                val icon = assetLoader.dexIcon(pokemon.species.toId())
+                icon?.let {
+                    val infoView = if (!pokemon.foe) binding.trainerInfo else binding.foeInfo
+                    infoView.updatePokemon(pokemon, BitmapDrawable(resources, it))
+                }
             }
         }
         if (soundEnabled) audioManager.playPokemonCry(pokemon, false)
@@ -647,13 +656,17 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     override fun onDetailsChanged(pokemon: BattlingPokemon) {
-        binding.battleLayout.getSpriteView(pokemon.id)?.apply {
-            glideHelper.loadBattleSprite(pokemon, this)
-        }
         fragmentScope.launch {
-            assetLoader.dexIcon(pokemon.species.toId())?.let {
-                val infoView = if (!pokemon.foe) binding.trainerInfo else binding.foeInfo
-                infoView.updatePokemon(pokemon, BitmapDrawable(resources, it))
+            val dexPokemon = assetLoader.dexPokemon(pokemon.species.toId())
+            pokemon.dexNum = dexPokemon?.num ?: pokemon.dexNum  // keep old num if forme not found
+            binding.battleLayout.getSpriteView(pokemon.id)?.apply {
+                glideHelper.loadBattleSprite(pokemon, this)
+            }
+            dexPokemon?.let {
+                assetLoader.dexIcon(pokemon.species.toId())?.let {
+                    val infoView = if (!pokemon.foe) binding.trainerInfo else binding.foeInfo
+                    infoView.updatePokemon(pokemon, BitmapDrawable(resources, it))
+                }
             }
         }
         if (soundEnabled && "mega" == pokemon.forme) audioManager.playPokemonCry(pokemon, false)

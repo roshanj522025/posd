@@ -17,6 +17,7 @@ class BattlingPokemon(val player: Player, switchMessage: String) : BasePokemon()
     var level: Int = 100
     var condition: Condition? = null
     var transformSpecies: String? = null
+    var dexNum: Int = 0  // Set by AssetLoader after dex lookup; used for PokeAPI sprite URLs
 
     val fainted get() = condition?.hp == 0 || condition?.status == "fnt"
 

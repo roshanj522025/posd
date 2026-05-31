@@ -3,13 +3,11 @@ package com.majeur.psclient.io
 import android.content.Context
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.net.Uri
 import android.view.ViewPropertyAnimator
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.RequestBuilder
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import com.majeur.psclient.R
@@ -19,7 +17,6 @@ import com.majeur.psclient.model.pokemon.BattlingPokemon
 import com.majeur.psclient.util.Utils
 import com.majeur.psclient.util.glide.AnimatedImageViewTarget
 import com.majeur.psclient.util.html.Html
-import com.majeur.psclient.util.minusFirst
 import com.majeur.psclient.widget.BattleLayout
 import timber.log.Timber
 import java.util.concurrent.ExecutionException
@@ -27,121 +24,120 @@ import kotlin.math.roundToInt
 
 class GlideHelper(context: Context) {
 
-    enum class SpriteType(private val path: String, private val ext: String) {
-
-        D3ANIMATED("ani", "gif"), // Gen 6+ 3D animated
-        D2ANIMATED("gen5ani", "gif"), // Gen 5 2D animated
-        D2("gen5", "png"), // Gen 5 2D non animated
-        DEX("dex", "png"),
-        TRAINER("trainers", "png"); // Dex
-
-        fun uri(spriteId: String, shiny: Boolean, back: Boolean): Uri = Uri.Builder().run {
-            scheme("https")
-            authority("play.pokemonshowdown.com")
-            appendPath("sprites")
-            var dir = path
-            if (back) dir += "-back"
-            if (shiny) dir += "-shiny"
-            appendPath(dir)
-            appendPath("$spriteId.$ext")
-            build()
-        }
-    }
-
     companion object {
         private const val MAGIC_SCALE = 0.0027777777777778f
+
+        // PokeAPI GitHub raw sprites — no hotlink protection, free to use.
+        // play.pokemonshowdown.com returns 403 for all non-browser HTTP clients.
+        private const val POKEAPI_BASE =
+            "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon"
+
+        fun animFrontUrl(num: Int, shiny: Boolean): String {
+            val s = if (shiny) "shiny/" else ""
+            return "$POKEAPI_BASE/versions/generation-v/black-white/animated/${s}${num}.gif"
+        }
+
+        fun animBackUrl(num: Int, shiny: Boolean): String {
+            val s = if (shiny) "shiny/" else ""
+            return "$POKEAPI_BASE/versions/generation-v/black-white/animated/back/${s}${num}.gif"
+        }
+
+        fun staticFrontUrl(num: Int, shiny: Boolean): String {
+            val s = if (shiny) "shiny/" else ""
+            return "$POKEAPI_BASE/${s}${num}.png"
+        }
+
+        fun staticBackUrl(num: Int, shiny: Boolean): String {
+            val s = if (shiny) "shiny/" else ""
+            return "$POKEAPI_BASE/back/${s}${num}.png"
+        }
+
+        // Trainer avatars still come from PS (no alternative); silently fails if 403
+        fun trainerUrl(avatar: String) =
+            "https://play.pokemonshowdown.com/sprites/trainers/$avatar.png"
     }
 
     private val glide = Glide.with(context)
 
     fun loadBattleSprite(pokemon: BattlingPokemon, imageView: ImageView) {
-        val spriteId = pokemon.transformSpecies ?: pokemon.spriteId
-        loadSprite(spriteId, pokemon.trainer, pokemon.shiny, true,
-                SpriteType.D3ANIMATED, SpriteType.D2ANIMATED, SpriteType.D2)
+        val num = pokemon.dexNum
+        if (num <= 0) { imageView.setImageResource(R.drawable.missingno); return }
+
+        val back  = pokemon.trainer
+        val shiny = pokemon.shiny
+        val anim   = if (back) animBackUrl(num, shiny)   else animFrontUrl(num, shiny)
+        val static = if (back) staticBackUrl(num, shiny) else staticFrontUrl(num, shiny)
+
+        glide.load(anim)
+            .apply(RequestOptions().override(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL))
+            .error(
+                glide.load(static)
+                    .apply(RequestOptions().override(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL))
+                    .error(R.drawable.missingno)
+            )
             .into(object : AnimatedImageViewTarget(imageView) {
 
-            override fun onInitInAnimation(viewPropertyAnimator: ViewPropertyAnimator) {
-                viewPropertyAnimator
-                        .setDuration(250)
-                        .setInterpolator(DecelerateInterpolator())
-                        .scaleX(0f)
-                        .scaleY(0f)
-                        .alpha(0f)
-            }
+                override fun onInitInAnimation(v: ViewPropertyAnimator) {
+                    v.setDuration(250).setInterpolator(DecelerateInterpolator())
+                     .scaleX(0f).scaleY(0f).alpha(0f)
+                }
 
-            override fun onInitOutAnimation(viewPropertyAnimator: ViewPropertyAnimator) {
-                viewPropertyAnimator
-                        .setDuration(250)
-                        .setInterpolator(AccelerateInterpolator())
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .alpha(1f)
-            }
+                override fun onInitOutAnimation(v: ViewPropertyAnimator) {
+                    v.setDuration(250).setInterpolator(AccelerateInterpolator())
+                     .scaleX(1f).scaleY(1f).alpha(1f)
+                }
 
                 override fun onApplyResourceSize(w: Int, h: Int) {
-                val layout = imageView.parent as? BattleLayout ?: return
-                val applySize = { fieldWidth: Int ->
-                    var scale = fieldWidth * MAGIC_SCALE
-                    if (!pokemon.foe) scale *= 1.5f
-                    getView().layoutParams.apply {
-                        width = (w * scale).roundToInt().coerceAtLeast(1)
-                        height = (h * scale).roundToInt().coerceAtLeast(1)
+                    val layout = imageView.parent as? BattleLayout ?: return
+                    val applySize = { fw: Int ->
+                        var scale = fw * MAGIC_SCALE
+                        if (!pokemon.foe) scale *= 1.5f
+                        getView().layoutParams.apply {
+                            width  = (w * scale).roundToInt().coerceAtLeast(1)
+                            height = (h * scale).roundToInt().coerceAtLeast(1)
+                        }
+                        getView().requestLayout()
                     }
-                    getView().requestLayout()
+                    if (layout.width > 0) applySize(layout.width)
+                    else layout.post { applySize(layout.width) }
                 }
-                if (layout.width > 0) {
-                    applySize(layout.width)
-                } else {
-                    // Layout hasn't measured yet — wait for it
-                    layout.post { applySize(layout.width) }
-                }
-            }
-        })
+            }).also { imageView.setTag(R.id.glide_tag, it) }
     }
 
     fun loadPreviewSprite(player: Player, pokemon: BasePokemon, imageView: ImageView) {
-        loadSprite(pokemon.spriteId, player == Player.TRAINER, false, true,
-                SpriteType.D3ANIMATED, SpriteType.D2ANIMATED, SpriteType.D2)
+        val num = (pokemon as? BattlingPokemon)?.dexNum ?: 0
+        if (num <= 0) { imageView.setImageResource(R.drawable.missingno); return }
+
+        val back = player == Player.TRAINER
+        val url  = if (back) staticBackUrl(num, false) else staticFrontUrl(num, false)
+
+        glide.load(url)
+            .apply(RequestOptions().override(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL))
+            .error(R.drawable.missingno)
             .into(object : AnimatedImageViewTarget(imageView) {
-                override fun onInitInAnimation(viewPropertyAnimator: ViewPropertyAnimator) = Unit
-                override fun onInitOutAnimation(viewPropertyAnimator: ViewPropertyAnimator) = Unit
+                override fun onInitInAnimation(v: ViewPropertyAnimator) = Unit
+                override fun onInitOutAnimation(v: ViewPropertyAnimator) = Unit
 
                 override fun onApplyResourceSize(w: Int, h: Int) {
-                    val fieldWidth = (imageView.parent as BattleLayout?)?.width ?: 0
+                    val fieldWidth = (imageView.parent as? BattleLayout)?.width ?: 0
                     val scale = fieldWidth * MAGIC_SCALE
                     imageView.layoutParams.apply {
-                        width = (w * scale).roundToInt()
-                        height = (h * scale).roundToInt()
-                        Timber.d("resouce set")
+                        width  = (w * scale).roundToInt().coerceAtLeast(1)
+                        height = (h * scale).roundToInt().coerceAtLeast(1)
+                        Timber.d("preview sprite sized $w×$h scale=$scale")
                     }
                 }
-            }).also {
-                imageView.setTag(R.id.glide_tag, it)
-            }
+            }).also { imageView.setTag(R.id.glide_tag, it) }
     }
 
     fun loadDexSprite(pokemon: BasePokemon, shiny: Boolean, imageView: ImageView) {
-        loadSprite(pokemon.spriteId, false, shiny, true, SpriteType.DEX, SpriteType.D2)
-                .into(imageView)
+        val num = (pokemon as? BattlingPokemon)?.dexNum ?: 0
+        val url = if (num > 0) staticFrontUrl(num, shiny) else return
+        glide.load(url).error(R.drawable.missingno).into(imageView)
     }
 
     fun loadAvatar(avatar: String, imageView: ImageView) {
-        loadSprite(avatar, false, false, false, SpriteType.TRAINER)
-                .into(imageView)
-    }
-
-    // Load sprite trying with each sprite type if previous has failed
-    private fun loadSprite(spriteId: String, back: Boolean, shiny: Boolean,
-                           overrideSize: Boolean, vararg spriteTypes: SpriteType): RequestBuilder<Drawable> {
-        val options = RequestOptions().apply {
-            if (overrideSize) override(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL)
-            if (spriteTypes.size == 1) error(R.drawable.missingno) // No more sprite types, default fallback
-        }
-        return glide.load(spriteTypes.first().uri(spriteId, shiny, back)).apply {
-            apply(options)
-            if (spriteTypes.size > 1) // There is more sprite types, add an error fallback
-                error(loadSprite(spriteId, back, shiny, overrideSize, *spriteTypes.minusFirst()))
-        }
+        glide.load(trainerUrl(avatar)).error(R.drawable.ic_pokeball).into(imageView)
     }
 
     fun getHtmlImageGetter(iconLoader: AssetLoader, maxWidth: Int): Html.ImageGetter {
@@ -150,7 +146,7 @@ class GlideHelper(context: Context) {
             try {
                 var d: Drawable? = null
                 if (source.startsWith("content://com.majeur.psclient/dex-icon/")) {
-                    val species = source.substring(source.lastIndexOf('/') + 1, source.length)
+                    val species = source.substring(source.lastIndexOf('/') + 1)
                     val icon = iconLoader.dexIconNonSuspend(species)
                     if (icon != null) d = BitmapDrawable(icon)
                 } else {
@@ -161,28 +157,20 @@ class GlideHelper(context: Context) {
                 var w: Int
                 var h: Int
                 if (reqw != 0 && reqh == 0) {
-                    w = reqw
-                    h = (w / r).toInt()
+                    w = reqw; h = (w / r).toInt()
                 } else if (reqw == 0 && reqh != 0) {
-                    h = reqh
-                    w = (h * r).toInt()
+                    h = reqh; w = (h * r).toInt()
                 } else {
-                    w = reqw
-                    h = reqh
+                    w = reqw; h = reqh
                 }
                 val mr = w / mw.toFloat()
-                if (mr > 1) {
-                    w = mw
-                    h /= mr.toInt()
-                }
+                if (mr > 1) { w = mw; h /= mr.toInt() }
                 d.setBounds(0, 0, w, h)
                 return@ImageGetter d
             } catch (e: ExecutionException) {
-                e.printStackTrace()
-                return@ImageGetter null
+                e.printStackTrace(); return@ImageGetter null
             } catch (e: InterruptedException) {
-                e.printStackTrace()
-                return@ImageGetter null
+                e.printStackTrace(); return@ImageGetter null
             }
         }
     }
