@@ -636,15 +636,23 @@ class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, Vi
         }
         // Look up dex number first so GlideHelper can build the PokeAPI URL
         fragmentScope.launch {
-            val dexPokemon = assetLoader.dexPokemon(pokemon.species.toId())
+            val speciesId = pokemon.species.toId()
+            val dexPokemon = assetLoader.dexPokemon(speciesId)
             pokemon.dexNum = dexPokemon?.num ?: 0
-            binding.battleLayout.getSpriteView(pokemon.id)?.apply {
-                setTag(R.id.battle_data_tag, pokemon)
-                battleTipPopup.addTippedView(this)
-                glideHelper.loadBattleSprite(pokemon, this)
+            Timber.d("onSwitch species=%s speciesId=%s num=%d spriteView=%s",
+                pokemon.species, speciesId, pokemon.dexNum,
+                binding.battleLayout.getSpriteView(pokemon.id))
+            val spriteView = binding.battleLayout.getSpriteView(pokemon.id)
+            if (spriteView != null) {
+                spriteView.setTag(R.id.battle_data_tag, pokemon)
+                battleTipPopup.addTippedView(spriteView)
+                glideHelper.loadBattleSprite(pokemon, spriteView)
+            } else {
+                Timber.w("onSwitch: getSpriteView returned null for %s pos=%d foe=%b",
+                    pokemon.species, pokemon.position, pokemon.foe)
             }
             dexPokemon?.let {
-                val icon = assetLoader.dexIcon(pokemon.species.toId())
+                val icon = assetLoader.dexIcon(speciesId)
                 icon?.let {
                     val infoView = if (!pokemon.foe) binding.trainerInfo else binding.foeInfo
                     infoView.updatePokemon(pokemon, BitmapDrawable(resources, it))
