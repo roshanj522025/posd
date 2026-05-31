@@ -9,7 +9,7 @@ class DexPokemon : BasePokemon() {
     var num = 0
     lateinit var firstType: String
     var secondType: String? = null
-    lateinit var baseStats: Stats
+    var baseStats: Stats = Stats()
     var abilities = emptyList<String>()
     var hiddenAbility: String? = null
     var height = 0f

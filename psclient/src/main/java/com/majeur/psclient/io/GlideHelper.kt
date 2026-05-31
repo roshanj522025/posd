@@ -79,12 +79,21 @@ class GlideHelper(context: Context) {
             }
 
                 override fun onApplyResourceSize(w: Int, h: Int) {
-                val fieldWidth = (imageView.parent as BattleLayout).width
-                var scale = fieldWidth * MAGIC_SCALE
-                if (!pokemon.foe) scale *= 1.5f
-                getView().layoutParams.apply {
-                    width = (w * scale).roundToInt()
-                    height = (h * scale).roundToInt()
+                val layout = imageView.parent as? BattleLayout ?: return
+                val applySize = { fieldWidth: Int ->
+                    var scale = fieldWidth * MAGIC_SCALE
+                    if (!pokemon.foe) scale *= 1.5f
+                    getView().layoutParams.apply {
+                        width = (w * scale).roundToInt().coerceAtLeast(1)
+                        height = (h * scale).roundToInt().coerceAtLeast(1)
+                    }
+                    getView().requestLayout()
+                }
+                if (layout.width > 0) {
+                    applySize(layout.width)
+                } else {
+                    // Layout hasn't measured yet — wait for it
+                    layout.post { applySize(layout.width) }
                 }
             }
         })
