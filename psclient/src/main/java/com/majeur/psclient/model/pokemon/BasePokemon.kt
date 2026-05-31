@@ -47,7 +47,11 @@ open class BasePokemon : Serializable {
 
         if (baseSpecies.isEmpty()) baseSpecies = species
 
-        spriteId = baseSpecies.toId() + "-" + (forme ?: "").toId()
+        // PS sprite filenames use lowercase with hyphens preserved (e.g. tauros-paldea-combat).
+        // toId() strips hyphens which breaks multi-part forme names — use toLowercase() instead.
+        val baseId = baseSpecies.lowercase(java.util.Locale.ROOT)
+        val formeId = (forme ?: "").lowercase(java.util.Locale.ROOT)
+        spriteId = if (formeId.isEmpty()) baseId else "$baseId-$formeId"
         if (spriteId.endsWith("totem")) spriteId = spriteId.removeSuffix("totem")
         spriteId = spriteId.removeSuffix("-")
     }
