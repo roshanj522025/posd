@@ -43,6 +43,7 @@ import com.majeur.psclient.widget.BattleDecisionWidget
 import com.majeur.psclient.widget.BattleLayout
 import com.majeur.psclient.widget.BattleTipPopup
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 class BattleFragment : BaseFragment(), BattleRoomMessageObserver.UiCallbacks, View.OnClickListener {
 
