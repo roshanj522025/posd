@@ -14,6 +14,12 @@ import com.majeur.psclient.model.common.Stats
 import com.majeur.psclient.model.pokemon.DexPokemon
 import com.majeur.psclient.util.toId
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import timber.log.Timber
+import java.io.IOException
+import java.io.InputStreamReader
+
 // Safe JsonReader extension: handles NUMBER, BOOLEAN, and STRING "true"/"false"
 private fun JsonReader.nextIntOrBool(trueVal: Int = 1, falseVal: Int = 0): Int {
     return when (peek()) {
@@ -30,11 +36,6 @@ private fun JsonReader.nextIntOrBool(trueVal: Int = 1, falseVal: Int = 0): Int {
         }
     }
 }
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import timber.log.Timber
-import java.io.IOException
-import java.io.InputStreamReader
 
 class AssetLoader(val context: Context) {
 
