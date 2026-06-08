@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flat launcher icon for API 24-25 (adaptive-icon not supported) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Dark background -->
+    <path
+        android:fillColor="#0D1117"
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
+
+    <!-- Terminal window outline -->
+    <path
+        android:fillColor="#21262D"
+        android:pathData="M14,26 Q14,20 20,20 L88,20 Q94,20 94,26 L94,82 Q94,88 88,88 L20,88 Q14,88 14,82 Z" />
+
+    <!-- Title bar -->
+    <path
+        android:fillColor="#161B22"
+        android:pathData="M14,20 Q14,20 20,20 L88,20 Q94,20 94,20 L94,34 L14,34 Z" />
+
+    <!-- Traffic lights -->
+    <path android:fillColor="#F85149"
+        android:pathData="M24,27 A4,4 0 1,1 24.01,27 Z" />
+    <path android:fillColor="#E3B341"
+        android:pathData="M36,27 A4,4 0 1,1 36.01,27 Z" />
+    <path android:fillColor="#3FB950"
+        android:pathData="M48,27 A4,4 0 1,1 48.01,27 Z" />
+
+    <!-- Prompt: > -->
+    <path
+        android:fillColor="#3FB950"
+        android:strokeColor="#3FB950"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M22,50 L32,58 L22,66" />
+
+    <!-- Cursor block -->
+    <path
+        android:fillColor="#3FB950"
+        android:pathData="M38,50 L56,50 L56,66 L38,66 Z"
+        android:fillAlpha="0.85"/>
+
+    <!-- Faint text lines -->
+    <path
+        android:fillColor="#30363D"
+        android:pathData="M22,76 L60,76 Q61,76 61,77.5 Q61,79 60,79 L22,79 Q21,79 21,77.5 Q21,76 22,76 Z" />
+    <path
+        android:fillColor="#21262D"
+        android:pathData="M22,72 L50,72 Q51,72 51,73.5 Q51,75 50,75 L22,75 Q21,75 21,73.5 Q21,72 22,72 Z" />
+
+</vector>
