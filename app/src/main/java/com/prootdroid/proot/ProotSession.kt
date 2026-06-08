@@ -71,7 +71,7 @@ class ProotSession(private val context: Context) {
             }
             .start()
 
-        Log.i(TAG, "PRoot started with PID: ${process!!.pid()}")
+        Log.i(TAG, "PRoot process started")
         return process!!
     }
 
