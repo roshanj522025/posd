@@ -1,0 +1,114 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:          # allow manual trigger from GitHub UI
+
+jobs:
+  build:
+    name: Build Debug & Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Java 17 ────────────────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # ── 3. Android SDK (API 34) ────────────────────────────────────────────
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK platforms and build-tools
+        run: |
+          sdkmanager --sdk_root=$ANDROID_HOME \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "platform-tools" \
+            --verbose
+
+      # ── 4. Gradle permission ───────────────────────────────────────────────
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # ── 5. Cache Gradle packages ───────────────────────────────────────────
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # ── 6. Build Debug APK ─────────────────────────────────────────────────
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      # ── 7. Build Release APK (unsigned) ────────────────────────────────────
+      - name: Build Release APK (unsigned)
+        run: ./gradlew assembleRelease --stacktrace
+
+      # ── 8. Rename outputs ──────────────────────────────────────────────────
+      - name: Rename APKs
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk \
+             artifacts/ProotDroid-debug.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk \
+             artifacts/ProotDroid-release-unsigned.apk
+
+      # ── 9. Upload artifacts ────────────────────────────────────────────────
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProotDroid-debug
+          path: artifacts/ProotDroid-debug.apk
+          retention-days: 30
+
+      - name: Upload Release APK (unsigned)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProotDroid-release-unsigned
+          path: artifacts/ProotDroid-release-unsigned.apk
+          retention-days: 30
+
+      # ── 10. Create GitHub Release on master push ───────────────────────────
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "ProotDroid Build #${{ github.run_number }}"
+          body: |
+            ## ProotDroid APK — Build #${{ github.run_number }}
+
+            **Commit:** `${{ github.sha }}`
+
+            ### Downloads
+            - `ProotDroid-debug.apk` — debug build, directly installable
+            - `ProotDroid-release-unsigned.apk` — release build (needs signing before install)
+
+            ### Install debug APK
+            ```
+            adb install ProotDroid-debug.apk
+            ```
+            Or enable *Install from unknown sources* and sideload.
+          files: |
+            artifacts/ProotDroid-debug.apk
+            artifacts/ProotDroid-release-unsigned.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

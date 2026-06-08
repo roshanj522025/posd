@@ -1,0 +1,27 @@
+# Built APKs and outputs
+/app/build/
+/build/
+*.apk
+*.aab
+*.ap_
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Android Studio
+*.iml
+.idea/
+local.properties
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Secrets — never commit signing keys or PATs
+keystore.jks
+*.keystore
+*.jks
+keystore.properties
