@@ -34,10 +34,12 @@ class BootstrapManager(private val context: Context) {
             "x86_64"      to "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-minirootfs-3.19.1-x86_64.tar.gz"
         )
 
+        // v5.4.0 and v5.3.1 releases have NO binary assets.
+        // v5.3.0 is the latest release that ships static binaries (confirmed via GitHub API).
         private val PROOT_URLS = mapOf(
-            "arm64-v8a"   to "https://github.com/proot-me/proot/releases/download/v5.4.0/proot-v5.4.0-aarch64-static",
-            "armeabi-v7a" to "https://github.com/proot-me/proot/releases/download/v5.4.0/proot-v5.4.0-arm-static",
-            "x86_64"      to "https://github.com/proot-me/proot/releases/download/v5.4.0/proot-v5.4.0-x86_64-static"
+            "arm64-v8a"   to "https://github.com/proot-me/proot/releases/download/v5.3.0/proot-v5.3.0-aarch64-static",
+            "armeabi-v7a" to "https://github.com/proot-me/proot/releases/download/v5.3.0/proot-v5.3.0-arm-static",
+            "x86_64"      to "https://github.com/proot-me/proot/releases/download/v5.3.0/proot-v5.3.0-x86_64-static"
         )
     }
 
