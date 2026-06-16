@@ -14,6 +14,7 @@ import com.prootdroid.proot.StorageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Storage picker screen.
