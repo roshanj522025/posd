@@ -3,7 +3,6 @@ package com.prootdroid.proot
 import android.content.Context
 import android.util.Log
 import java.io.File
-
 /**
  * Wraps a proot process running Alpine Linux.
  *
@@ -26,15 +25,11 @@ class ProotSession(private val context: Context) {
     }
 
     private val bootstrapManager = BootstrapManager(context)
+    private val storageMgr       = StorageManager(context)
     private var process: Process? = null
 
     val isRunning: Boolean get() = process?.isAlive == true
 
-    /**
-     * Builds the proot command and starts the process.
-     * Returns a [Process] whose stdin/stdout/stderr are available for
-     * the terminal emulator to attach to.
-     */
     fun start(): Process {
         if (isRunning) {
             Log.w(TAG, "Session already running, returning existing process")
@@ -43,7 +38,7 @@ class ProotSession(private val context: Context) {
 
         val proot    = bootstrapManager.prootPath()
         val rootfs   = bootstrapManager.rootfsPath()
-        val tmpDir   = File(context.filesDir, "tmp").also { it.mkdirs() }
+        val tmpDir   = storageMgr.tmpDir.also { it.mkdirs() }
 
         val cmd = mutableListOf(
             proot,
@@ -82,7 +77,7 @@ class ProotSession(private val context: Context) {
     fun openShell(): Process {
         val proot  = bootstrapManager.prootPath()
         val rootfs = bootstrapManager.rootfsPath()
-        val tmpDir = File(context.filesDir, "tmp").also { it.mkdirs() }
+        val tmpDir = storageMgr.tmpDir.also { it.mkdirs() }
 
         val cmd = mutableListOf(
             proot,
@@ -95,7 +90,7 @@ class ProotSession(private val context: Context) {
             "--kill-on-exit",
             "--link2symlink",
             "--change-id=0:0",
-            "/bin/sh", "-l"             // login shell
+            "/bin/sh", "-l"
         )
 
         val env = buildEnvironment(rootfs)

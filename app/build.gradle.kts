@@ -67,8 +67,11 @@ dependencies {
     // OkHttp for bootstrap download
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Progress / UI
-    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    // CardView for storage picker UI
+    implementation("androidx.cardview:cardview:1.0.0")
+
+    // AndroidX DocumentFile for SAF
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

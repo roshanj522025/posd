@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0D1117">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#161B22"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Current location card -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CURRENT STORAGE"
+                android:textColor="#8B949E"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.12"
+                android:layout_marginBottom="6dp" />
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="8dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+                    <TextView
+                        android:id="@+id/tvCurrentMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#C9D1D9"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+                    <TextView
+                        android:id="@+id/tvCurrentPath"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="#8B949E"
+                        android:textSize="11sp"
+                        android:fontFamily="monospace" />
+                    <TextView
+                        android:id="@+id/tvFreeSpace"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="#3FB950"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- SD card info card -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SD CARD"
+                android:textColor="#8B949E"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.12"
+                android:layout_marginBottom="6dp" />
+
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardSdInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:cardBackgroundColor="#161B22"
+                app:cardCornerRadius="8dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+                    <TextView
+                        android:id="@+id/tvSdStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#3FB950"
+                        android:textSize="14sp"
+                        android:fontFamily="monospace" />
+                    <TextView
+                        android:id="@+id/tvSdPath"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="#8B949E"
+                        android:textSize="11sp"
+                        android:fontFamily="monospace" />
+                    <TextView
+                        android:id="@+id/tvSdFree"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="#58A6FF"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <TextView
+                android:id="@+id/tvNoSd"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:padding="14dp"
+                android:textColor="#E3B341"
+                android:textSize="13sp"
+                android:fontFamily="monospace"
+                android:background="#21262D"
+                android:visibility="gone" />
+
+            <!-- Status message -->
+            <TextView
+                android:id="@+id/tvStatusMsg"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:padding="12dp"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:lineSpacingMultiplier="1.4"
+                android:background="#21262D"
+                android:visibility="gone" />
+
+            <!-- Action buttons -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPickFolder"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginBottom="10dp"
+                android:text="📂  Pick SD Card Folder"
+                android:textSize="15sp"
+                android:backgroundTint="#1F6FEB" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMigrateData"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginBottom="10dp"
+                android:text="⬆  Move Existing Data to SD Card"
+                android:textSize="14sp"
+                android:backgroundTint="#238636"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnUseInternal"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="📱  Switch Back to Internal Storage"
+                android:textSize="14sp"
+                android:backgroundTint="#30363D"
+                android:visibility="gone" />
+
+            <!-- Info note -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="ℹ  Pick the ProotDroid folder on your SD card. The app will navigate you to Android/data/com.prootdroid/files/. The proot binary stays on internal storage so Android can execute it directly."
+                android:textColor="#484F58"
+                android:textSize="11sp"
+                android:lineSpacingMultiplier="1.5" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

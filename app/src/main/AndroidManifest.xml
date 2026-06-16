@@ -37,6 +37,11 @@
             android:configChanges="orientation|keyboardHidden|screenSize" />
 
         <activity
+            android:name=".ui.StoragePickerActivity"
+            android:exported="false"
+            android:configChanges="orientation|keyboardHidden|screenSize" />
+
+        <activity
             android:name=".ui.MainActivity"
             android:exported="false"
             android:configChanges="orientation|keyboardHidden|screenSize|screenLayout"

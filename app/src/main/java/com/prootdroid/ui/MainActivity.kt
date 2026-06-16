@@ -110,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_restart  -> { prootService?.restartSession(); true }
+            R.id.action_storage  -> { startActivity(Intent(this, StoragePickerActivity::class.java)); true }
             R.id.action_console  -> { startActivity(Intent(this, ConsoleActivity::class.java)); true }
             R.id.action_about    -> { AboutDialog().show(supportFragmentManager, "about"); true }
             else -> super.onOptionsItemSelected(item)
