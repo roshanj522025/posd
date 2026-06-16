@@ -12,32 +12,29 @@ import kotlinx.coroutines.launch
 class SplashActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySplashBinding
-    private lateinit var bootstrapManager: BootstrapManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivitySplashBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        bootstrapManager = BootstrapManager(this)
-
         lifecycleScope.launch {
-            delay(800) // Brief splash display
-            if (bootstrapManager.isInstalled()) {
-                goToMain()
-            } else {
-                goToSetup()
+            delay(600)
+            try {
+                val mgr = BootstrapManager(this@SplashActivity)
+                if (mgr.isInstalled()) {
+                    startActivity(Intent(this@SplashActivity, MainActivity::class.java))
+                } else {
+                    startActivity(Intent(this@SplashActivity, SetupActivity::class.java))
+                }
+                finish()
+            } catch (e: Exception) {
+                // Never crash — send everything to the console activity
+                val intent = Intent(this@SplashActivity, ConsoleActivity::class.java)
+                intent.putExtra(ConsoleActivity.EXTRA_CRASH, "Startup error:\n${e.stackTraceToString()}")
+                startActivity(intent)
+                finish()
             }
         }
-    }
-
-    private fun goToMain() {
-        startActivity(Intent(this, MainActivity::class.java))
-        finish()
-    }
-
-    private fun goToSetup() {
-        startActivity(Intent(this, SetupActivity::class.java))
-        finish()
     }
 }

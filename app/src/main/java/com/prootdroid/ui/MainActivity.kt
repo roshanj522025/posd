@@ -23,13 +23,15 @@ class MainActivity : AppCompatActivity() {
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            val binder = service as ProotService.ProotBinder
-            prootService = binder.getService()
-            serviceBound = true
-            // Start proot session if not already running
-            prootService?.startSession()
+            try {
+                val binder = service as ProotService.ProotBinder
+                prootService = binder.getService()
+                serviceBound = true
+                prootService?.startSession()
+            } catch (e: Exception) {
+                routeToConsole("Service connection error:\n${e.stackTraceToString()}")
+            }
         }
-
         override fun onServiceDisconnected(name: ComponentName?) {
             prootService = null
             serviceBound = false
@@ -38,48 +40,66 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
-        setSupportActionBar(binding.toolbar)
-        supportActionBar?.title = "ProotDroid"
+        // Global uncaught exception handler — show console instead of crash dialog
+        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
+            runOnUiThread {
+                routeToConsole("Uncaught exception:\n${throwable.stackTraceToString()}")
+            }
+        }
 
-        setupTabs()
-        bindProotService()
+        try {
+            binding = ActivityMainBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+            setSupportActionBar(binding.toolbar)
+            supportActionBar?.title = "ProotDroid"
+            setupTabs()
+            bindProotService()
+        } catch (e: Exception) {
+            routeToConsole("MainActivity init error:\n${e.stackTraceToString()}")
+        }
     }
 
     private fun setupTabs() {
-        val terminalFragment = TerminalFragment()
-        val vncFragment = VncFragment()
-
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragmentContainer, terminalFragment, "terminal")
+            .replace(R.id.fragmentContainer, TerminalFragment(), "terminal")
             .commit()
 
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
-                val fragment = when (tab.position) {
-                    0 -> supportFragmentManager.findFragmentByTag("terminal")
-                        ?: TerminalFragment()
-                    1 -> supportFragmentManager.findFragmentByTag("vnc")
-                        ?: VncFragment()
-                    else -> return
+                try {
+                    val (frag, tag) = when (tab.position) {
+                        0 -> (supportFragmentManager.findFragmentByTag("terminal") ?: TerminalFragment()) to "terminal"
+                        1 -> (supportFragmentManager.findFragmentByTag("vnc")      ?: VncFragment())      to "vnc"
+                        else -> return
+                    }
+                    supportFragmentManager.beginTransaction()
+                        .replace(R.id.fragmentContainer, frag, tag)
+                        .commit()
+                } catch (e: Exception) {
+                    routeToConsole("Tab switch error:\n${e.stackTraceToString()}")
                 }
-                val tag = if (tab.position == 0) "terminal" else "vnc"
-                supportFragmentManager.beginTransaction()
-                    .replace(R.id.fragmentContainer, fragment, tag)
-                    .commit()
             }
-
             override fun onTabUnselected(tab: TabLayout.Tab) {}
             override fun onTabReselected(tab: TabLayout.Tab) {}
         })
     }
 
     private fun bindProotService() {
-        val intent = Intent(this, ProotService::class.java)
-        startForegroundService(intent)
-        bindService(intent, serviceConnection, BIND_AUTO_CREATE)
+        try {
+            val intent = Intent(this, ProotService::class.java)
+            startForegroundService(intent)
+            bindService(intent, serviceConnection, BIND_AUTO_CREATE)
+        } catch (e: Exception) {
+            routeToConsole("Failed to bind ProotService:\n${e.stackTraceToString()}")
+        }
+    }
+
+    private fun routeToConsole(message: String) {
+        val intent = Intent(this, ConsoleActivity::class.java)
+        intent.putExtra(ConsoleActivity.EXTRA_CRASH, message)
+        startActivity(intent)
+        finish()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -89,27 +109,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            R.id.action_restart -> {
-                prootService?.restartSession()
-                true
-            }
-            R.id.action_vnc_connect -> {
-                binding.tabLayout.getTabAt(1)?.select()
-                true
-            }
-            R.id.action_about -> {
-                AboutDialog().show(supportFragmentManager, "about")
-                true
-            }
+            R.id.action_restart  -> { prootService?.restartSession(); true }
+            R.id.action_console  -> { startActivity(Intent(this, ConsoleActivity::class.java)); true }
+            R.id.action_about    -> { AboutDialog().show(supportFragmentManager, "about"); true }
             else -> super.onOptionsItemSelected(item)
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (serviceBound) {
-            unbindService(serviceConnection)
-            serviceBound = false
-        }
+        if (serviceBound) { unbindService(serviceConnection); serviceBound = false }
     }
 }
